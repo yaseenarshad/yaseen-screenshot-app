@@ -1,0 +1,25 @@
+# CI: every pull request gets a build and the unit tests on an Apple Silicon Mac of GitHub.
+# It does not make a .dmg. The release workflow does that.
+name: ci
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    # macOS 26 on Apple Silicon. The label is fixed, so a new `macos-latest` cannot break the build.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the newest Xcode on the runner
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_*.app | grep -v -i -E 'beta|candidate' | sort -V | tail -n 1)"
+          echo "Selected: $XCODE"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+      - name: Print the tool versions
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+      - run: swift build
+      - run: swift test

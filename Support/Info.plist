@@ -8,6 +8,8 @@
 	<string>Yaseen Screenshot</string>
 	<key>CFBundleExecutable</key>
 	<string>YaseenScreenshot</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.yaseenarshad.yaseenscreenshot</string>
 	<key>CFBundleInfoDictionaryVersion</key>
