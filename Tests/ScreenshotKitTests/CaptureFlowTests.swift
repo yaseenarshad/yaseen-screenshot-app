@@ -75,6 +75,106 @@ import Testing
         #expect(PixelReader(tiffImage)[0, 0] == patternPixel(x: left, y: top))
     }
 
+    /// Reads the one PNG that a capture wrote to the folder of the sandbox.
+    private func savedImage(in sandbox: Sandbox) throws -> (image: CGImage, data: Data) {
+        #expect(sandbox.fileNames == ["Snip20261012_1.png"])
+        let data = try Data(contentsOf: sandbox.folder.appendingPathComponent("Snip20261012_1.png"))
+        let source = try #require(CGImageSourceCreateWithData(data as CFData, nil))
+        return (try #require(CGImageSourceCreateImageAtIndex(source, 0, nil)), data)
+    }
+
+    /// YAZ-2766: drag a box, move it, change its size, press Enter. The PNG has the size of the final box.
+    @Test func aBoxThatWasMovedAndResizedIsSavedAtItsFinalSize() async throws {
+        let sandbox = try Sandbox()
+        let saver = ScreenshotSaver(pasteboard: sandbox.pasteboard, folder: sandbox.folder)
+        let interaction = CaptureInteraction(displays: try await FakeScreenCapture().freezeAllDisplays(), styles: ToolStyleMemory())
+        var outcome: CaptureOutcome?
+        interaction.onFinish = { outcome = $0 }
+        let retina = FakeScreenCapture.retinaID
+        func drag(from start: CGPoint, to end: CGPoint) {
+            interaction.pointerDown(at: start, on: retina)
+            interaction.pointerDragged(to: end)
+            interaction.pointerUp(at: end)
+        }
+
+        drag(from: CGPoint(x: 20, y: 10), to: CGPoint(x: 100, y: 50)) // the box: 80 by 40 points
+        drag(from: CGPoint(x: 60, y: 30), to: CGPoint(x: 90, y: 40)) // move it by 30, 10: x 50 to 130, y 20 to 60
+        drag(from: CGPoint(x: 130, y: 60), to: CGPoint(x: 160, y: 90)) // the bottom-right handle
+        drag(from: CGPoint(x: 50, y: 55), to: CGPoint(x: 40, y: 55)) // the left handle
+        #expect(interaction.selection(on: retina)?.rect == CGRect(x: 40, y: 20, width: 120, height: 70))
+        interaction.key(.enter)
+
+        try saver.deliver(try #require(outcome), date: day)
+        saver.waitForPendingWrites()
+        let image = try savedImage(in: sandbox).image
+        // 120 by 70 points at scale 2.
+        #expect(image.width == 240 && image.height == 140)
+        let pixels = PixelReader(image)
+        #expect(pixels[0, 0] == patternPixel(x: 80, y: 40))
+        #expect(pixels[239, 139] == patternPixel(x: 319, y: 179))
+    }
+
+    /// YAZ-2767: drag a box, draw a red rectangle, press Enter. The PNG has red pixels on the
+    /// rectangle and the original pixels in other places. The test runs at scale 2 and at scale 1.
+    @Test(arguments: [
+        (FakeScreenCapture.retinaID, 2),
+        (FakeScreenCapture.plainID, 1),
+    ])
+    func aRedRectangleIsInTheSavedImageAtThePixelScaleOfTheScreen(displayID: CGDirectDisplayID, scale: Int) async throws {
+        let sandbox = try Sandbox()
+        let saver = ScreenshotSaver(pasteboard: sandbox.pasteboard, folder: sandbox.folder)
+        let interaction = CaptureInteraction(displays: try await FakeScreenCapture().freezeAllDisplays(), styles: ToolStyleMemory())
+        var outcome: CaptureOutcome?
+        interaction.onFinish = { outcome = $0 }
+
+        // The box: x 20 to 150, y 10 to 70. The rectangle in it: x 20 to 80, y 10 to 40 of the box.
+        interaction.pointerDown(at: CGPoint(x: 20, y: 10), on: displayID)
+        interaction.pointerUp(at: CGPoint(x: 150, y: 70))
+        interaction.selectTool(.rectangle)
+        interaction.pointerDown(at: CGPoint(x: 40, y: 20), on: displayID)
+        interaction.pointerDragged(to: CGPoint(x: 70, y: 30))
+        interaction.pointerUp(at: CGPoint(x: 100, y: 50))
+        interaction.key(.enter)
+
+        try saver.deliver(try #require(outcome), date: day)
+        saver.waitForPendingWrites()
+        let saved = try savedImage(in: sandbox)
+        #expect(saved.image.width == 130 * scale && saved.image.height == 60 * scale)
+        let pixels = PixelReader(saved.image)
+        let red = Pixel(.red)
+        func original(_ x: Int, _ y: Int) -> Pixel { patternPixel(x: 20 * scale + x, y: 10 * scale + y) }
+
+        // The line is 4 points wide: 4 pixels at scale 1 and 8 pixels at scale 2, around each edge.
+        let middleRow = 25 * scale
+        let redInRow = (0..<pixels.width).filter { pixels[$0, middleRow].isNear(red) }
+        #expect(redInRow == Array((18 * scale)..<(22 * scale)) + Array((78 * scale)..<(82 * scale)))
+        let middleColumn = 50 * scale
+        let redInColumn = (0..<pixels.height).filter { pixels[middleColumn, $0].isNear(red) }
+        #expect(redInColumn == Array((8 * scale)..<(12 * scale)) + Array((38 * scale)..<(42 * scale)))
+
+        // Each pixel that is not on the line is the pixel of the frozen image: inside the rectangle
+        // (no fill), outside it, and at the four corners of the image.
+        var changed = 0
+        for y in 0..<pixels.height {
+            for x in 0..<pixels.width where pixels[x, y] != original(x, y) {
+                changed += 1
+                let onLineX = (18 * scale..<22 * scale).contains(x) || (78 * scale..<82 * scale).contains(x)
+                let onLineY = (8 * scale..<12 * scale).contains(y) || (38 * scale..<42 * scale).contains(y)
+                if !(onLineX && (8 * scale..<42 * scale).contains(y)) && !(onLineY && (18 * scale..<82 * scale).contains(x)) {
+                    Issue.record("The pixel \(x), \(y) is not on the line, but it changed")
+                    return
+                }
+            }
+        }
+        #expect(changed > 300 * scale * scale)
+        #expect(pixels[0, 0] == original(0, 0))
+        #expect(pixels[pixels.width - 1, pixels.height - 1] == original(pixels.width - 1, pixels.height - 1))
+        #expect(pixels[middleColumn, middleRow] == original(middleColumn, middleRow))
+
+        // The private pasteboard holds the same PNG.
+        #expect(sandbox.pasteboard.data(forType: .png) == saved.data)
+    }
+
     @Test func escGivesACancelNoFileAndAnEmptyPasteboard() async throws {
         let sandbox = try Sandbox()
         let saver = ScreenshotSaver(pasteboard: sandbox.pasteboard, folder: sandbox.folder)
