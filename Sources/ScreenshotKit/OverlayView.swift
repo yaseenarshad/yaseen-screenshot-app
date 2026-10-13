@@ -1,11 +1,13 @@
 import AppKit
 
 /// The content of one overlay window: the frozen image, the dim area, the box with its handles
-/// and its label, the marks, the toolbar and the text field.
+/// and its label, the marks, the outline and the handles of the selected mark, the toolbar and
+/// the text field.
 ///
 /// A thin adapter. It turns `NSEvent`s into calls on `CaptureInteraction`, and it draws the state
-/// that it reads there. A pointer move changes only paths and frames. Only a change of the marks
-/// makes an image again, and that image has the size of the box. The frozen image is never drawn again.
+/// that it reads there. A pointer move and a change of the selected mark change only paths and
+/// frames. Only a change of the marks makes an image again, and that image has the size of the
+/// box. The frozen image is never drawn again.
 final class OverlayView: NSView, NSTextViewDelegate {
     private static let borderColor = CGColor(srgbRed: 0.10, green: 0.55, blue: 1.0, alpha: 1)
     private static let dimColor = CGColor(gray: 0, alpha: 0.45)
@@ -27,6 +29,12 @@ final class OverlayView: NSView, NSTextViewDelegate {
     private let dimLayer = CAShapeLayer()
     private let marksLayer = CALayer()
     private let borderLayer = CAShapeLayer()
+    // The outline of the selected mark: a white line with blue dashes on it, so it shows on a
+    // light and on a dark screen. These layers are only in the overlay, never in the saved image.
+    private let markOutlineLayer = CAShapeLayer()
+    private let markDashLayer = CAShapeLayer()
+    /// The handles of the box, or the handles of the selected mark. They never show together:
+    /// the box has its handles only while no mark exists.
     private let handlesLayer = CAShapeLayer()
     private let labelLayer = CALayer()
     private let labelTextLayer = CATextLayer()
@@ -67,6 +75,13 @@ final class OverlayView: NSView, NSTextViewDelegate {
         borderLayer.fillColor = nil
         borderLayer.strokeColor = OverlayView.borderColor
         borderLayer.lineWidth = 1
+        markOutlineLayer.fillColor = nil
+        markOutlineLayer.strokeColor = .white
+        markOutlineLayer.lineWidth = 1
+        markDashLayer.fillColor = nil
+        markDashLayer.strokeColor = OverlayView.borderColor
+        markDashLayer.lineWidth = 1
+        markDashLayer.lineDashPattern = [4, 3]
         handlesLayer.fillColor = .white
         handlesLayer.strokeColor = OverlayView.borderColor
         handlesLayer.lineWidth = 1
@@ -80,7 +95,10 @@ final class OverlayView: NSView, NSTextViewDelegate {
             "path": NSNull(), "hidden": NSNull(), "position": NSNull(), "bounds": NSNull(),
             "contents": NSNull(), "string": NSNull(),
         ]
-        for sublayer in [dimLayer, marksLayer, borderLayer, handlesLayer, labelLayer, hintLayer] {
+        let sublayers = [
+            dimLayer, marksLayer, borderLayer, markOutlineLayer, markDashLayer, handlesLayer, labelLayer, hintLayer,
+        ]
+        for sublayer in sublayers {
             sublayer.contentsScale = display.scale
             sublayer.actions = noActions
             root.addSublayer(sublayer)
@@ -120,8 +138,28 @@ final class OverlayView: NSView, NSTextViewDelegate {
 
         // The border is outside the box, so it hides no pixel of the box.
         borderLayer.path = bright.map { CGPath(rect: $0.insetBy(dx: -0.5, dy: -0.5), transform: nil) }
-        handlesLayer.path = interaction.showsHandles ? box.map(handlesPath(around:)) : nil
         hintLayer.isHidden = !interaction.showsHint
+
+        // The selected mark is in the points of the box. Its outline and its handles are paths,
+        // so a new selection makes no image.
+        var markOutline: CGPath?
+        var handles: CGPath?
+        if let selection = selection, let mark = interaction.selectedMark {
+            let origin = selection.rect.origin
+            // On the middle of a pixel, so the 1 point line is sharp.
+            let outline = viewRect(for: mark.outline.offsetBy(dx: origin.x, dy: origin.y).integral)
+            markOutline = CGPath(rect: outline.insetBy(dx: 0.5, dy: 0.5), transform: nil)
+            handles = handlesPath(at: mark.handles.map {
+                CGPoint(x: origin.x + $0.point.x, y: bounds.height - origin.y - $0.point.y)
+            })
+        } else if interaction.showsHandles, let box = box {
+            // Eight squares on the middle of the 1 point border: the corners and the edge middles.
+            let line = box.insetBy(dx: -0.5, dy: -0.5)
+            handles = handlesPath(at: Handle.allCases.map { Selection.handlePoint($0, of: line) })
+        }
+        markOutlineLayer.path = markOutline
+        markDashLayer.path = markOutline
+        handlesLayer.path = handles
 
         var toolbarFrame = CGRect.null
         if let selection = selection, interaction.showsToolbar(on: display.displayID) {
@@ -140,23 +178,20 @@ final class OverlayView: NSView, NSTextViewDelegate {
         refreshTextView(in: selection)
     }
 
-    /// Eight squares on the border: the four corners and the four edge middles.
-    private func handlesPath(around box: CGRect) -> CGPath {
-        // The squares sit on the middle of the 1 point border, on whole points.
-        let line = box.insetBy(dx: -0.5, dy: -0.5)
+    /// One square for each handle, with its middle at the given point.
+    private func handlesPath(at middles: [CGPoint]) -> CGPath {
         let half = OverlayView.handleSide / 2
         let path = CGMutablePath()
-        for x in [line.minX, line.midX, line.maxX] {
-            for y in [line.minY, line.midY, line.maxY] where !(x == line.midX && y == line.midY) {
-                let square = CGRect(
-                    x: (x - half).rounded(.down),
-                    y: (y - half).rounded(.down),
-                    width: OverlayView.handleSide,
-                    height: OverlayView.handleSide
-                )
-                // The 1 point edge is inside the square, so it is sharp at scale 1.
-                path.addRect(square.insetBy(dx: 0.5, dy: 0.5))
-            }
+        for middle in middles {
+            // The squares are on whole points.
+            let square = CGRect(
+                x: (middle.x - half).rounded(.down),
+                y: (middle.y - half).rounded(.down),
+                width: OverlayView.handleSide,
+                height: OverlayView.handleSide
+            )
+            // The 1 point edge is inside the square, so it is sharp at scale 1.
+            path.addRect(square.insetBy(dx: 0.5, dy: 0.5))
         }
         return path
     }
@@ -243,7 +278,8 @@ final class OverlayView: NSView, NSTextViewDelegate {
 
     private func makeTextView(for edit: TextEdit, in selection: Selection) {
         // The same layout as `MarkRenderer`, so the lines break where the saved image breaks them.
-        let layout = TextLayout(text: "", style: edit.style, wrapWidth: edit.wrapWidth)
+        // A text that is open again starts with its old text.
+        let layout = TextLayout(text: edit.text, style: edit.style, wrapWidth: edit.wrapWidth)
         let box = viewRect(for: selection.rect)
         // From the place of the text to the right and the bottom edge of the box.
         let frame = CGRect(
@@ -269,6 +305,7 @@ final class OverlayView: NSView, NSTextViewDelegate {
         field.isAutomaticDashSubstitutionEnabled = false
         field.isContinuousSpellCheckingEnabled = false
         apply(edit.style, to: field)
+        field.setSelectedRange(NSRange(location: (edit.text as NSString).length, length: 0))
 
         addSubview(field, positioned: .below, relativeTo: toolbar)
         textView = field
@@ -389,6 +426,7 @@ final class OverlayView: NSView, NSTextViewDelegate {
         switch event.keyCode {
         case 36, 76: interaction.key(.enter) // Return, and Enter on the number pad
         case 53: interaction.key(.escape)
+        case 51, 117: interaction.key(.delete) // Backspace, and Delete
         default: break // No call to super: an unknown key must not beep.
         }
     }

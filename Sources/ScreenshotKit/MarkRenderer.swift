@@ -21,24 +21,23 @@ public enum MarkRenderer {
     }
 
     public static func draw(_ mark: Mark, in context: CGContext) {
-        guard let first = mark.points.first, let last = mark.points.last else { return }
-        let lineWidth = mark.style.lineWidth(for: mark.tool)
+        guard let first = mark.points.first else { return }
         let color = MarkRenderer.color(mark.style.color)
 
         context.saveGState()
         defer { context.restoreGState() }
         context.setStrokeColor(color)
         context.setFillColor(color)
-        context.setLineWidth(lineWidth)
+        context.setLineWidth(mark.lineWidth)
 
         switch mark.tool {
         case .rectangle:
             context.setLineJoin(.miter)
-            context.stroke(rect(between: first, and: last))
+            context.stroke(mark.frame)
         case .ellipse:
-            context.strokeEllipse(in: rect(between: first, and: last))
+            context.strokeEllipse(in: mark.frame)
         case .arrow:
-            drawArrow(from: first, to: last, lineWidth: lineWidth, in: context)
+            drawArrow(mark, from: first, in: context)
         case .pen:
             context.setLineCap(.round)
             context.setLineJoin(.round)
@@ -59,30 +58,20 @@ public enum MarkRenderer {
 
     // MARK: Shapes
 
-    private static func rect(between a: CGPoint, and b: CGPoint) -> CGRect {
-        CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x), height: abs(a.y - b.y))
-    }
-
-    /// A line with a filled head at `end`. The head grows with the line width.
-    private static func drawArrow(from start: CGPoint, to end: CGPoint, lineWidth: CGFloat, in context: CGContext) {
-        let length = hypot(end.x - start.x, end.y - start.y)
-        guard length > 0 else { return }
-        let direction = CGPoint(x: (end.x - start.x) / length, y: (end.y - start.y) / length)
-        // A short arrow is only a head.
-        let headLength = min(lineWidth * 3 + 6, length)
-        let halfWidth = headLength * 0.45
-        let base = CGPoint(x: end.x - direction.x * headLength, y: end.y - direction.y * headLength)
-
-        if length > headLength {
+    /// A line with a filled head at the end of the drag. The model gives the corners of the head
+    /// (`Mark.arrowHead`), so the hit test of the mark uses the same numbers.
+    private static func drawArrow(_ mark: Mark, from start: CGPoint, in context: CGContext) {
+        guard let head = mark.arrowHead else { return }
+        if let shaftEnd = head.shaftEnd {
             // The line stops at the base of the head, so the tip stays sharp.
             context.setLineCap(.round)
             context.move(to: start)
-            context.addLine(to: base)
+            context.addLine(to: shaftEnd)
             context.strokePath()
         }
-        context.move(to: end)
-        context.addLine(to: CGPoint(x: base.x - direction.y * halfWidth, y: base.y + direction.x * halfWidth))
-        context.addLine(to: CGPoint(x: base.x + direction.y * halfWidth, y: base.y - direction.x * halfWidth))
+        context.move(to: head.tip)
+        context.addLine(to: head.left)
+        context.addLine(to: head.right)
         context.closePath()
         context.fillPath()
     }

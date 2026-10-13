@@ -48,10 +48,73 @@ import Testing
         #expect(list.marks == [mark(1), mark(3)])
     }
 
+    /// YAZ-2782 row 20: Undo and Redo of a move, a size change, a style change and a delete.
+    @Test func undoAndRedoOfAMoveASizeChangeAStyleChangeAndADelete() {
+        let box = CGSize(width: 100, height: 60)
+        let rectangle = Mark(
+            tool: .rectangle, style: MarkStyle(color: .red, size: .medium), points: [CGPoint(x: 20, y: 10), CGPoint(x: 60, y: 40)]
+        )
+        var blue = rectangle.resized(.frame(.right), to: CGPoint(x: 80, y: 0), in: box).moved(by: CGPoint(x: 5, y: 5), in: box)
+        blue.style.color = .blue
+
+        var list = MarkList()
+        var states = [list.marks]
+        func record(_ list: MarkList) { states.append(list.marks) }
+        list.add(rectangle)
+        record(list)
+        list.add(mark(7))
+        record(list)
+        var changed = list.replace(at: 0, with: rectangle.moved(by: CGPoint(x: 5, y: 5), in: box)) // a move
+        #expect(changed)
+        record(list)
+        changed = list.replace(at: 0, with: list.marks[0].resized(.frame(.right), to: CGPoint(x: 85, y: 0), in: box)) // a size change
+        #expect(changed)
+        record(list)
+        changed = list.replace(at: 0, with: blue) // a style change
+        #expect(changed)
+        record(list)
+        list.remove(at: 0) // a delete
+        record(list)
+        #expect(list.marks == [mark(7)])
+        #expect(Set(states.map(\.count)) == [0, 1, 2] && states[4] != states[3] && states[5] != states[4])
+
+        // Each Undo takes back one change, down to the empty list. Each Redo puts one back.
+        for step in (0..<6).reversed() {
+            let worked = list.undo()
+            #expect(worked && list.marks == states[step], "undo to state \(step)")
+        }
+        var worked = list.undo()
+        #expect(!worked && list.isEmpty && !list.canUndo && list.canRedo)
+        for step in 1...6 {
+            worked = list.redo()
+            #expect(worked && list.marks == states[step], "redo to state \(step)")
+        }
+        worked = list.redo()
+        #expect(!worked)
+
+        // A change that changes nothing is no Undo step, and a place that does not exist changes nothing.
+        let before = list
+        changed = list.replace(at: 0, with: mark(7))
+        #expect(!changed && list == before)
+        changed = list.replace(at: 5, with: rectangle)
+        list.remove(at: 5)
+        #expect(!changed && list == before)
+
+        // A change after an Undo clears the Redo list.
+        list.undo() // the delete: the blue rectangle is back
+        #expect(list.marks == [blue, mark(7)] && list.canRedo)
+        list.remove(at: 1)
+        #expect(list.marks == [blue] && !list.canRedo)
+        // The box changed: the list forgets its changes, and keeps its marks.
+        list.clearHistory()
+        worked = list.undo()
+        #expect(!worked && !list.canUndo && list.marks == [blue])
+    }
+
     @Test func theStylesOfTheTools() {
-        // The first time: Highlight has amber, each other tool has red, and all have Medium.
+        // The first time: Highlight has amber, each other tool has red, and all have Thick (D15 on YAZ-2782).
         for tool in Tool.allCases {
-            let expected = MarkStyle(color: tool == .highlight ? .amber : .red, size: .medium)
+            let expected = MarkStyle(color: tool == .highlight ? .amber : .red, size: .thick)
             #expect(MarkStyle.initial(for: tool) == expected)
             #expect(ToolStyleMemory()[tool] == expected)
         }
@@ -244,5 +307,246 @@ import Testing
         #expect(try render([red, black])[30, 20] == .black)
         #expect(try render([black, red])[30, 20].isNear(Pixel(.red)))
         #expect(try render([])[30, 20] == .white)
+    }
+}
+
+/// The geometry of a mark for the Select tool (YAZ-2782): the hit test, the move and the size
+/// change. Pure functions of the model, with no view. A Text mark measures its text, so the suite
+/// runs on the main actor.
+@MainActor @Suite struct MarkGeometryTests {
+    /// The box of these tests: 100 by 60 points.
+    private let box = CGSize(width: 100, height: 60)
+
+    private func mark(_ tool: Tool, _ size: MarkSize, _ points: [CGPoint]) -> Mark {
+        Mark(tool: tool, style: MarkStyle(color: .red, size: size), points: points)
+    }
+
+    private func text(_ string: String, at origin: CGPoint, _ size: MarkSize = .thick) -> Mark {
+        Mark(tool: .text, style: MarkStyle(color: .red, size: size), points: [origin], text: string, wrapWidth: box.width - origin.x)
+    }
+
+    private func isNear(_ a: CGFloat, _ b: CGFloat) -> Bool { abs(a - b) < 0.001 }
+
+    /// Rows 5 and 6: the tolerance is 6 points around the line, and the inside of a Rectangle and
+    /// of an Ellipse is a part of the mark.
+    @Test func theHitTestOfEachKindOfMarkWithItsTolerance() {
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
+        #expect(Mark.hitTolerance == 6)
+
+        // Rectangle, Medium: the line is 4 points, so a click 8 points from its middle still hits.
+        let rectangle = mark(.rectangle, .medium, [point(20, 20), point(80, 60)])
+        #expect(rectangle.part(at: point(20, 40)) == .line)
+        #expect(rectangle.part(at: point(12, 40)) == .line && rectangle.part(at: point(11, 40)) == nil)
+        #expect(rectangle.part(at: point(12, 12)) == .line && rectangle.part(at: point(11, 12)) == nil)
+        #expect(rectangle.part(at: point(50, 68)) == .line && rectangle.part(at: point(50, 69)) == nil)
+        #expect(rectangle.part(at: point(28, 40)) == .line && rectangle.part(at: point(29, 40)) == .inside)
+        #expect(rectangle.part(at: point(50, 40)) == .inside)
+        // With no tolerance, only the line itself hits.
+        #expect(rectangle.part(at: point(18, 40), tolerance: 0) == .line)
+        #expect(rectangle.part(at: point(17, 40), tolerance: 0) == nil)
+        #expect(rectangle.part(at: point(23, 40), tolerance: 0) == .inside)
+
+        // Ellipse, Thin: 7 points from the middle of the line. It is not hit at the corner of its rectangle.
+        let ellipse = mark(.ellipse, .thin, [point(80, 60), point(20, 20)])
+        #expect(ellipse.part(at: point(20, 40)) == .line)
+        #expect(ellipse.part(at: point(13, 40)) == .line && ellipse.part(at: point(12, 40)) == nil)
+        #expect(ellipse.part(at: point(50, 67)) == .line && ellipse.part(at: point(50, 68)) == nil)
+        #expect(ellipse.part(at: point(26, 40)) == .line && ellipse.part(at: point(28, 40)) == .inside)
+        #expect(ellipse.part(at: point(50, 40)) == .inside)
+        #expect(ellipse.part(at: point(22, 22)) == nil)
+
+        // Arrow, Thick: 9.5 points from the line, and the head, which is wider than that.
+        let arrow = mark(.arrow, .thick, [point(20, 30), point(80, 30)])
+        #expect(arrow.part(at: point(50, 30)) == .line)
+        #expect(arrow.part(at: point(50, 39)) == .line && arrow.part(at: point(50, 40)) == nil)
+        #expect(arrow.part(at: point(11, 30)) == .line && arrow.part(at: point(10, 30)) == nil)
+        #expect(arrow.part(at: point(89, 30)) == .line && arrow.part(at: point(90, 30)) == nil)
+        // The head is 27 points long and 12 points wide at each side of its base, at x 53.
+        #expect(arrow.part(at: point(55, 41)) == .line && arrow.part(at: point(55, 19)) == .line)
+        #expect(arrow.part(at: point(75, 41)) == nil)
+        // The bounds have the round start of the line, the tip, and the full width of the head.
+        #expect(isNear(arrow.bounds.minX, 16.5) && isNear(arrow.bounds.maxX, 83.5))
+        #expect(isNear(arrow.bounds.minY, 17.85) && isNear(arrow.bounds.maxY, 42.15))
+
+        // Pen, Thin: 7 points from each part of the line, also around a corner.
+        let pen = mark(.pen, .thin, [point(10, 10), point(40, 10), point(40, 40)])
+        #expect(pen.part(at: point(25, 17)) == .line && pen.part(at: point(25, 18)) == nil)
+        #expect(pen.part(at: point(47, 25)) == .line && pen.part(at: point(48, 25)) == nil)
+        #expect(pen.part(at: point(44, 6)) == .line && pen.part(at: point(45, 5)) == nil)
+        #expect(pen.part(at: point(25, 30)) == nil)
+
+        // Highlight, Thick: the line is 24 points, so 18 points from its middle.
+        let highlight = mark(.highlight, .thick, [point(10, 30), point(90, 30)])
+        #expect(highlight.part(at: point(50, 48)) == .line && highlight.part(at: point(50, 49)) == nil)
+        #expect(highlight.part(at: point(50, 12)) == .line && highlight.part(at: point(50, 11)) == nil)
+
+        // Text: the area of its lines, and 6 points around it.
+        let hello = text("Hello", at: point(10, 5))
+        let bounds = hello.bounds
+        #expect(bounds.minX == 10 && bounds.minY == 5)
+        #expect(bounds.width > 40 && bounds.width < 80 && bounds.height > 24 && bounds.height < 36)
+        #expect(hello.part(at: point(bounds.midX, bounds.midY)) == .line)
+        #expect(hello.part(at: point(bounds.maxX + 5, bounds.midY)) == .line)
+        #expect(hello.part(at: point(bounds.maxX + 7, bounds.midY)) == nil)
+        #expect(hello.part(at: point(bounds.midX, bounds.maxY + 5)) == .line)
+        #expect(hello.part(at: point(bounds.midX, bounds.maxY + 7)) == nil)
+    }
+
+    /// Row 7, and the addition to it: a line wins over the empty inside of a larger mark.
+    @Test func theMarkThatWasDrawnLastWinsAndALineWinsOverAnEmptyInside() {
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
+        var list = MarkList()
+        #expect(list.index(at: point(50, 30)) == nil)
+        list.add(mark(.pen, .thin, [point(10, 30), point(90, 30)])) // 0: a line from the left to the right
+        list.add(mark(.pen, .thin, [point(50, 10), point(50, 50)])) // 1: a line from the top to the bottom
+        // The two lines cross at 50, 30: the line that was drawn last wins.
+        #expect(list.index(at: point(50, 30)) == 1)
+        #expect(list.index(at: point(20, 30)) == 0)
+        #expect(list.index(at: point(50, 45)) == 1)
+        #expect(list.index(at: point(80, 50)) == nil)
+
+        // A large rectangle that was drawn last, around the two lines.
+        list.add(mark(.rectangle, .thin, [point(5, 5), point(95, 55)])) // 2
+        // In its empty inside, away from the lines: the rectangle.
+        #expect(list.index(at: point(75, 45)) == 2)
+        // On a line inside it: the line, although the rectangle was drawn last.
+        #expect(list.index(at: point(50, 30)) == 1)
+        #expect(list.index(at: point(30, 33)) == 0)
+        // On the line of the rectangle and on the first line: two lines, so the last one wins.
+        #expect(list.index(at: point(8, 30)) == 2)
+
+        // Two rectangles, the small one inside the large one. In both insides, the last one wins.
+        var small = MarkList()
+        small.add(mark(.rectangle, .thin, [point(30, 20), point(60, 40)]))
+        small.add(mark(.rectangle, .thin, [point(5, 5), point(95, 55)]))
+        #expect(small.index(at: point(45, 30)) == 1)
+        // The line of the small rectangle still selects it.
+        #expect(small.index(at: point(30, 30)) == 0)
+        var large = MarkList()
+        large.add(mark(.rectangle, .thin, [point(5, 5), point(95, 55)]))
+        large.add(mark(.rectangle, .thin, [point(30, 20), point(60, 40)]))
+        #expect(large.index(at: point(45, 30)) == 1 && large.index(at: point(80, 30)) == 0)
+    }
+
+    /// Row 12: the move stops when the bounds of the mark touch an edge of the box.
+    @Test func aMoveStopsAtTheEdgesOfTheBox() {
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
+        // Medium is 4 points: the bounds are 2 points around the rectangle of the drag.
+        let rectangle = mark(.rectangle, .medium, [point(20, 10), point(60, 40)])
+        #expect(rectangle.bounds == CGRect(x: 18, y: 8, width: 44, height: 34))
+        #expect(rectangle.outline == CGRect(x: 15, y: 5, width: 50, height: 40))
+        #expect(rectangle.moved(by: point(10, 5), in: box).points == [point(30, 15), point(70, 45)])
+        // A move uses whole points, so a sharp line stays sharp.
+        #expect(rectangle.moved(by: point(10.4, 4.6), in: box).points == [point(30, 15), point(70, 45)])
+        #expect(rectangle.moved(by: point(900, 900), in: box).points == [point(58, 28), point(98, 58)])
+        #expect(rectangle.moved(by: point(-900, -900), in: box).points == [point(2, 2), point(42, 32)])
+        #expect(rectangle.moved(by: point(900, -3), in: box).points == [point(58, 7), point(98, 37)])
+
+        // Each kind of mark: in each direction the bounds stop at the edge, and the shape stays.
+        let marks = [
+            rectangle,
+            mark(.ellipse, .thick, [point(60, 40), point(30, 20)]),
+            mark(.arrow, .thick, [point(30, 20), point(60, 40)]),
+            mark(.pen, .thick, [point(30, 20), point(45, 35), point(60, 25)]),
+            mark(.highlight, .thick, [point(30, 30), point(60, 32)]),
+            text("Hi", at: point(30, 15)),
+        ]
+        for mark in marks {
+            let start = mark.bounds
+            #expect(start.minX > 0 && start.minY > 0 && start.maxX < box.width && start.maxY < box.height, "\(mark.tool)")
+            let far = mark.moved(by: point(900, 900), in: box)
+            let near = mark.moved(by: point(-900, -900), in: box)
+            if mark.tool == .text {
+                // A text stays on whole points, so it stops less than 1 point before the edge.
+                #expect(far.bounds.maxX <= 100 && far.bounds.maxX > 99 && far.bounds.maxY <= 60 && far.bounds.maxY > 59)
+                // Its lines break at the right edge of the box, and it still has the same lines.
+                #expect(far.wrapWidth == box.width - far.points[0].x && near.wrapWidth == 100)
+                #expect(far.bounds.size == start.size && near.bounds.size == start.size)
+            } else {
+                #expect(isNear(far.bounds.maxX, 100) && isNear(far.bounds.maxY, 60), "\(mark.tool)")
+            }
+            #expect(isNear(near.bounds.minX, 0) && isNear(near.bounds.minY, 0), "\(mark.tool)")
+            for moved in [far, near] {
+                #expect(isNear(moved.bounds.width, start.width) && isNear(moved.bounds.height, start.height), "\(mark.tool)")
+                let shift = CGPoint(x: moved.points[0].x - mark.points[0].x, y: moved.points[0].y - mark.points[0].y)
+                #expect(moved.points == mark.points.map { CGPoint(x: $0.x + shift.x, y: $0.y + shift.y) }, "\(mark.tool)")
+                #expect(moved.style == mark.style && moved.text == mark.text)
+            }
+        }
+    }
+
+    /// Rows 10, 13 and 14: the handles, and a size change of a Rectangle, an Ellipse and an Arrow.
+    @Test func aSizeChangeOfARectangleAnEllipseAndAnArrow() throws {
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
+        let rectangle = mark(.rectangle, .medium, [point(60, 40), point(20, 10)])
+
+        // Eight handles, on the corners and the edge middles of the rectangle. The hit area is
+        // the hit area of a handle of the box: 12 by 12 points.
+        #expect(rectangle.handles.map(\.key) == Handle.allCases.map { MarkHandle.frame($0) })
+        #expect(rectangle.handles.map(\.point) == [
+            point(20, 10), point(60, 10), point(60, 40), point(20, 40),
+            point(40, 10), point(60, 25), point(40, 40), point(20, 25),
+        ])
+        #expect(rectangle.handle(at: point(62, 27))?.key == .frame(.right))
+        #expect(rectangle.handle(at: point(66, 25))?.key == .frame(.right) && rectangle.handle(at: point(67, 25)) == nil)
+        #expect(rectangle.handle(at: point(58, 43))?.key == .frame(.bottomRight))
+        #expect(rectangle.handle(at: point(40, 25)) == nil)
+
+        func frame(_ handle: Handle, to target: CGPoint, of mark: Mark? = nil) -> CGRect {
+            (mark ?? rectangle).resized(.frame(handle), to: target, in: box).frame
+        }
+        // A corner handle changes two edges. An edge handle changes one edge.
+        #expect(frame(.bottomRight, to: point(80, 50)) == CGRect(x: 20, y: 10, width: 60, height: 40))
+        #expect(frame(.topLeft, to: point(10, 5)) == CGRect(x: 10, y: 5, width: 50, height: 35))
+        #expect(frame(.left, to: point(30, 999)) == CGRect(x: 30, y: 10, width: 30, height: 30))
+        #expect(frame(.bottom, to: point(-999, 50)) == CGRect(x: 20, y: 10, width: 40, height: 40))
+        for handle in Handle.allCases {
+            // Each handle moves only its own edges.
+            let resized = frame(handle, to: point(50, 30))
+            #expect(resized.minX == (handle.horizontal < 0 ? 50 : 20) && resized.minY == (handle.vertical < 0 ? 30 : 10), "\(handle)")
+            #expect(resized.maxX == (handle.horizontal > 0 ? 50 : 60) && resized.maxY == (handle.vertical > 0 ? 30 : 40), "\(handle)")
+        }
+        // The size change stops in the box: the middle of the line is half a line width inside.
+        #expect(frame(.bottomRight, to: point(900, 900)) == CGRect(x: 20, y: 10, width: 78, height: 48))
+        #expect(frame(.topLeft, to: point(-900, -900)) == CGRect(x: 2, y: 2, width: 58, height: 38))
+        // Through the opposite edge the rectangle turns over, and it stays correct.
+        #expect(frame(.left, to: point(90, 25)) == CGRect(x: 60, y: 10, width: 30, height: 30))
+        #expect(frame(.bottomRight, to: point(5, 4)) == CGRect(x: 5, y: 4, width: 15, height: 6))
+        // The smallest side is 4 points.
+        #expect(frame(.right, to: point(21, 25)) == CGRect(x: 20, y: 10, width: 4, height: 30))
+        #expect(frame(.bottomRight, to: point(20, 10)) == CGRect(x: 20, y: 10, width: 4, height: 4))
+        // Whole points, as the box.
+        #expect(frame(.bottomRight, to: point(70.4, 44.6)) == CGRect(x: 20, y: 10, width: 50, height: 35))
+        // The style and the kind stay.
+        let resized = rectangle.resized(.frame(.right), to: point(80, 25), in: box)
+        #expect(resized.tool == .rectangle && resized.style == rectangle.style && resized.points.count == 2)
+
+        // A Thick rectangle that was drawn to the edge of the box has edges on half points
+        // (3.5 points inside). An edge that does not move stays exactly where it is.
+        let thick = mark(.rectangle, .thick, [point(20, 10), point(96.5, 56.5)])
+        #expect(frame(.topLeft, to: point(30, 20), of: thick) == CGRect(x: 30, y: 20, width: 66.5, height: 36.5))
+        #expect(frame(.left, to: point(-900, 0), of: thick) == CGRect(x: 3.5, y: 10, width: 93, height: 46.5))
+
+        // An Ellipse follows the same rules.
+        let ellipse = mark(.ellipse, .thin, [point(20, 10), point(60, 40)])
+        #expect(ellipse.handles.count == 8)
+        #expect(frame(.top, to: point(0, -50), of: ellipse) == CGRect(x: 20, y: 1, width: 40, height: 39))
+        #expect(frame(.bottomRight, to: point(80, 50), of: ellipse) == CGRect(x: 20, y: 10, width: 60, height: 40))
+
+        // An Arrow has one handle at each end. A drag of one end moves that end, and the other end stays.
+        let arrow = mark(.arrow, .medium, [point(20, 30), point(80, 30)])
+        #expect(arrow.handles.map(\.key) == [.end(0), .end(1)])
+        #expect(arrow.handles.map(\.point) == [point(20, 30), point(80, 30)])
+        #expect(arrow.handle(at: point(83, 27))?.key == .end(1) && arrow.handle(at: point(50, 30)) == nil)
+        #expect(arrow.resized(.end(1), to: point(60, 50), in: box).points == [point(20, 30), point(60, 50)])
+        #expect(arrow.resized(.end(0), to: point(-50, 500), in: box).points == [point(2, 58), point(80, 30)])
+        // An end that comes onto the other end: the arrow keeps a length of 4 points.
+        #expect(arrow.resized(.end(1), to: point(21, 30), in: box).points == [point(20, 30), point(24, 30)])
+        #expect(arrow.resized(.end(1), to: point(20, 30), in: box) == arrow)
+
+        // A Pen, a Highlight and a Text mark have no handle. They only move.
+        for mark in [mark(.pen, .thin, [point(10, 10), point(40, 40)]), mark(.highlight, .thin, [point(10, 10), point(40, 40)]), text("Hi", at: point(10, 10))] {
+            #expect(mark.handles.isEmpty && mark.handle(at: mark.points[0]) == nil, "\(mark.tool)")
+        }
     }
 }

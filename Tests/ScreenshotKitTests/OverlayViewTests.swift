@@ -291,7 +291,7 @@ import Testing
             CGRect(x: toolbar.frame.minX, y: 600 - toolbar.frame.maxY, width: toolbar.frame.width, height: toolbar.frame.height)
         }
         // Below the box (8 points), with its right edge on the right edge of the box.
-        #expect(frame() == CGRect(x: 210, y: 308, width: 290, height: 36))
+        #expect(frame() == CGRect(x: 180, y: 308, width: 320, height: 36))
 
         /// The pixels of light text in an area of the dim screen: the text of the size label.
         func lightPixels(x: Range<Int>, y: Range<Int>) throws -> Int {
@@ -311,17 +311,18 @@ import Testing
         // The toolbar and the label move with the box, also during the drag.
         view.mouseDown(with: try stage.mouse(.leftMouseDown, 300, 200))
         view.mouseDragged(with: try stage.mouse(.leftMouseDragged, 350, 220))
-        #expect(frame() == CGRect(x: 260, y: 328, width: 290, height: 36))
+        #expect(frame() == CGRect(x: 230, y: 328, width: 320, height: 36))
         #expect(try lightPixels(x: 100..<200, y: 78..<95) == 0)
         #expect(try lightPixels(x: 150..<250, y: 98..<115) > 10)
         view.mouseUp(with: try stage.mouse(.leftMouseUp, 350, 220))
         // It follows a size change.
         try stage.drag(from: CGPoint(x: 550, y: 320), to: CGPoint(x: 600, y: 400))
         #expect(stage.boxRect == CGRect(x: 150, y: 120, width: 450, height: 280))
-        #expect(frame() == CGRect(x: 310, y: 408, width: 290, height: 36))
+        #expect(frame() == CGRect(x: 280, y: 408, width: 320, height: 36))
 
         // The buttons, in the order of the toolbar, each with its name.
-        let names = ["Rectangle", "Ellipse", "Arrow", "Pen", "Highlight", "Text", "Undo", "Cancel", "Done"]
+        // "Select" is the first button (YAZ-2782 row 1).
+        let names = ["Select", "Rectangle", "Ellipse", "Arrow", "Pen", "Highlight", "Text", "Undo", "Cancel", "Done"]
         let buttons = try names.map { try #require(toolbar.button(named: $0)) }
         #expect(buttons.map(\.frame.minX) == buttons.map(\.frame.minX).sorted())
         #expect(buttons.allSatisfy { $0.image != nil && $0.superview === toolbar })
@@ -334,16 +335,16 @@ import Testing
         try stage.press("Rectangle")
         #expect(stage.interaction.tool == .rectangle)
         #expect(!optionsRow.isHidden)
-        #expect(frame() == CGRect(x: 310, y: 408, width: 290, height: 72))
+        #expect(frame() == CGRect(x: 280, y: 408, width: 320, height: 72))
         #expect((toolbar.button(named: "Rectangle") as? ToolbarButton)?.isOn == true)
-        // The first time: red and Medium.
-        let medium = try #require(toolbar.button(named: "Medium") as? ToolbarButton)
-        #expect(red.isOn && medium.isOn)
+        // The first time: red and Thick (D15 on YAZ-2782).
+        let thick = try #require(toolbar.button(named: "Thick") as? ToolbarButton)
+        #expect(red.isOn && thick.isOn)
 
         try stage.press("Blue")
-        try stage.press("Thick")
-        #expect(stage.interaction.style == MarkStyle(color: .blue, size: .thick))
-        #expect(!red.isOn && !medium.isOn)
+        try stage.press("Medium")
+        #expect(stage.interaction.style == MarkStyle(color: .blue, size: .medium))
+        #expect(!red.isOn && !thick.isOn)
         #expect((toolbar.button(named: "Blue") as? ToolbarButton)?.isOn == true)
         // Highlight has its own colour: amber.
         try stage.press("Highlight")
@@ -369,7 +370,7 @@ import Testing
         // A click on the selected tool clears the selection, and the second row goes away.
         try stage.press("Highlight")
         #expect(stage.interaction.tool == nil && optionsRow.isHidden)
-        #expect(frame() == CGRect(x: 310, y: 408, width: 290, height: 36))
+        #expect(frame() == CGRect(x: 280, y: 408, width: 320, height: 36))
 
         // A mark makes Undo active.
         try stage.press("Arrow")
@@ -439,6 +440,9 @@ import Testing
 
         try stage.drag(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 500, y: 300))
         try stage.press("Text")
+        // Medium is 18 points. The first size is Thick, 24 points.
+        #expect(stage.interaction.style?.fontSize == 24)
+        try stage.press("Medium")
         #expect(view.textView == nil)
 
         // A click in the box puts a text field at that point. The field has the keyboard.
@@ -523,6 +527,186 @@ import Testing
         }
         #expect(result.marks.marks.map(\.text) == ["Hello", "Two words", "Last"])
         #expect(!panel.isVisible)
+    }
+
+    // MARK: Select a mark (YAZ-2782)
+
+    @Test func theOverlayShowsTheSelectedMarkWithAnOutlineAndHandlesAndTheSavedImageHasNone() async throws {
+        // 400 by 300 points at scale 2, in a panel that is never shown. The box is x 50 to 250,
+        // y 60 to 160: pixels 100 to 500, and 120 to 320. Its label is above it.
+        NSApplication.shared.setActivationPolicy(.accessory)
+        var window: OverlayWindow?
+        let stage = Stage(display: Stage.largeRetinaDisplay) { interaction in
+            let made = OverlayWindow(display: Stage.largeRetinaDisplay, interaction: interaction)
+            window = made
+            return made.overlayView
+        }
+        let panel = try #require(window)
+        defer { panel.close() }
+        let view = stage.view, toolbar = view.toolbar, interaction = stage.interaction
+        try stage.drag(from: CGPoint(x: 50, y: 60), to: CGPoint(x: 250, y: 160))
+        let selection = try #require(interaction.selection(on: stage.display.displayID))
+
+        // "Select" is the first button, with the arrow pointer symbol, and its name shows on hover (row 1).
+        let select = try #require(toolbar.button(named: "Select") as? ToolbarButton)
+        let rectangleButton = try #require(toolbar.button(named: "Rectangle") as? ToolbarButton)
+        #expect(select.frame.minX == 4 && rectangleButton.frame.minX == 34)
+        #expect(NSImage(systemSymbolName: "cursorarrow", accessibilityDescription: nil) != nil && select.image != nil)
+        let tip = try #require(toolbar.subviews.compactMap { $0 as? NSTextField }.first)
+        select.mouseEntered(with: try #require(NSEvent.enterExitEvent(
+            with: .mouseEntered, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+            context: nil, eventNumber: 0, trackingNumber: 0, userData: nil
+        )))
+        #expect(!tip.isHidden && tip.stringValue == "Select")
+
+        // Two marks: a Thick red rectangle, x 90 to 200 and y 80 to 140 of the screen, and the
+        // text "Hello" inside it, at 110, 90.
+        try stage.press("Rectangle")
+        try stage.drag(from: CGPoint(x: 90, y: 80), to: CGPoint(x: 200, y: 140))
+        try stage.press("Text")
+        try stage.click(at: CGPoint(x: 110, y: 105))
+        var field = try #require(view.textView)
+        field.insertText("Hello", replacementRange: NSRange(location: NSNotFound, length: 0))
+        field.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        #expect(interaction.marks.marks.map(\.tool) == [.rectangle, .text])
+        #expect(interaction.marks.marks[1].points == [CGPoint(x: 60, y: 30)])
+
+        // "Select" with no selected mark: the second row does not show (row 3), and the box in the
+        // overlay is the image that the file gets.
+        try stage.press("Select")
+        let optionsRow = try #require(toolbar.button(named: "Red")?.superview)
+        #expect(interaction.isSelecting && select.isOn && !rectangleButton.isOn && optionsRow.isHidden)
+        func savedImage() throws -> PixelReader {
+            PixelReader(try composeFinalImage(frozen: stage.display, selection: selection, marks: interaction.marks))
+        }
+        /// The pixels of the box in the overlay that are not the pixels of the image.
+        func differences(from image: PixelReader) throws -> Int {
+            let overlay = try stage.renderedPixels()
+            var count = 0
+            for y in 0..<image.height {
+                for x in 0..<image.width where overlay[100 + x, 120 + y] != image[x, y] {
+                    count += 1
+                }
+            }
+            return count
+        }
+        let final = try savedImage()
+        #expect(final.width == 400 && final.height == 200)
+        #expect(try differences(from: final) == 0)
+
+        // A click on the line of the rectangle selects it. The second row shows its colour and its size.
+        try stage.click(at: CGPoint(x: 90, y: 110))
+        #expect(interaction.selectedIndex == 0 && !optionsRow.isHidden)
+        #expect((toolbar.button(named: "Red") as? ToolbarButton)?.isOn == true)
+        #expect((toolbar.button(named: "Thick") as? ToolbarButton)?.isOn == true)
+
+        // The overlay shows eight white handles, on the corners and the edge middles of the rectangle (row 10).
+        let selected = try stage.renderedPixels()
+        for (x, y) in [(90, 80), (145, 80), (200, 80), (200, 110), (200, 140), (145, 140), (90, 140), (90, 110)] {
+            #expect(selected[x * 2, y * 2] == .white, "the handle at \(x), \(y)")
+            #expect(final[x * 2 - 100, y * 2 - 120].isNear(Pixel(.red)), "the image at \(x), \(y)")
+        }
+        // The outline is 3 points outside the bounds: its top line is at y 73, pixel rows 146 and 147.
+        // It is thin and dashed: white pixels and blue pixels, and no pixel of the screen (row 9).
+        let blue = Pixel(red: 26, green: 140, blue: 255)
+        var white = 0, dashes = 0
+        for x in 170..<410 {
+            for y in [146, 147] {
+                if selected[x, y] == .white {
+                    white += 1
+                } else if selected[x, y].isNear(blue) {
+                    dashes += 1
+                } else {
+                    Issue.record("The pixel \(x), \(y) is not a pixel of the outline: \(selected[x, y])")
+                    return
+                }
+            }
+            #expect(selected[x, 145] == patternPixel(x: x, y: 145) && selected[x, 148] == patternPixel(x: x, y: 148))
+        }
+        #expect(white > 100 && dashes > 100)
+        #expect(selected[166, 220].isNear(blue) || selected[166, 220] == .white) // the left line of the outline
+        // The image that the file gets has no handle and no outline: it is the same image as before.
+        #expect(try differences(from: final) > 1_000)
+        #expect(try differences(from: try savedImage()) > 1_000)
+
+        // A drag from its top line, between two handles, moves the mark by 10, 5. The mark, its
+        // outline and its handles follow during the drag.
+        view.mouseDown(with: try stage.mouse(.leftMouseDown, 115, 80))
+        view.mouseDragged(with: try stage.mouse(.leftMouseDragged, 125, 85))
+        let during = try stage.renderedPixels()
+        #expect(during[200, 250].isNear(Pixel(.red))) // the left line is at x 100 now
+        #expect(during[200, 230] == .white && during[420, 290] == .white) // the handles moved with it
+        #expect(during[180, 250] == patternPixel(x: 180, y: 250)) // the old place shows the screen again
+        // The list of marks changes at the release: one drag is one Undo step.
+        #expect(interaction.marks.marks[0].frame == CGRect(x: 40, y: 20, width: 110, height: 60))
+        view.mouseUp(with: try stage.mouse(.leftMouseUp, 125, 85))
+        #expect(interaction.marks.marks[0].frame == CGRect(x: 50, y: 25, width: 110, height: 60))
+        #expect(stage.boxRect == selection.rect)
+
+        // Esc clears the selection, and the capture stays open (row 22). With no selected mark,
+        // each pixel of the box in the overlay is again the pixel of the image.
+        view.keyDown(with: try stage.key(53))
+        #expect(interaction.selectedIndex == nil && stage.outcomes.isEmpty && optionsRow.isHidden)
+        let moved = try savedImage()
+        #expect(try differences(from: moved) == 0)
+        #expect(try differences(from: final) > 1_000)
+
+        // A double-click on the text opens its field again, with the old text (row 19).
+        view.mouseDown(with: try stage.mouse(.leftMouseDown, 125, 105))
+        view.mouseUp(with: try stage.mouse(.leftMouseUp, 125, 105))
+        #expect(interaction.selectedIndex == 1 && view.textView == nil)
+        view.mouseDown(with: try stage.mouse(.leftMouseDown, 125, 105, clicks: 2))
+        view.mouseUp(with: try stage.mouse(.leftMouseUp, 125, 105))
+        field = try #require(view.textView)
+        #expect(field.string == "Hello" && panel.firstResponder === field && stage.outcomes.isEmpty)
+        #expect(field.selectedRange() == NSRange(location: 5, length: 0))
+        // The field is where the text is: from 110, 90 to the right and the bottom edge of the box.
+        #expect(field.frame == CGRect(x: 110, y: 140, width: 140, height: 70))
+        #expect(field.font?.pointSize == 24)
+        // The image below the field has no text now, so the text does not show two times.
+        let rectangleOnly = PixelReader(try composeImage(frozen: stage.display, selection: selection, marks: [interaction.marks.marks[0]]))
+        #expect(try differences(from: rectangleOnly) == 0)
+        // A size button changes the font of the open text (row 18).
+        try stage.press("Thin")
+        #expect(field.font?.pointSize == 14)
+        // Return completes the text: one mark changed, and no mark is new.
+        field.insertText(" there", replacementRange: NSRange(location: NSNotFound, length: 0))
+        field.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        #expect(view.textView == nil && panel.firstResponder === view)
+        #expect(interaction.marks.marks.map(\.text) == ["", "Hello there"])
+        #expect(interaction.marks.marks[1].style == MarkStyle(color: .red, size: .thin))
+        // An empty text removes the mark.
+        view.mouseDown(with: try stage.mouse(.leftMouseDown, 125, 98, clicks: 2))
+        view.mouseUp(with: try stage.mouse(.leftMouseUp, 125, 98))
+        field = try #require(view.textView)
+        field.insertText("", replacementRange: NSRange(location: 0, length: 11))
+        field.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+        #expect(interaction.marks.marks.map(\.tool) == [.rectangle] && view.textView == nil)
+
+        // Backspace removes the selected mark (row 16). Then no mark exists, and the box has its handles again.
+        try stage.click(at: CGPoint(x: 100, y: 115))
+        #expect(interaction.selectedIndex == 0)
+        view.keyDown(with: try stage.key(51))
+        #expect(interaction.marks.isEmpty && interaction.selectedIndex == nil)
+        #expect(try stage.renderedPixels()[100, 120] == .white) // the top-left handle of the box
+        // Command-Z puts the mark back, and Delete removes it again after a click.
+        #expect(view.performKeyEquivalent(with: try stage.key(6, "z", flags: .command)))
+        #expect(interaction.marks.marks.map(\.tool) == [.rectangle])
+        #expect(try differences(from: PixelReader(try composeFinalImage(frozen: stage.display, selection: selection, marks: interaction.marks))) == 0)
+        try stage.click(at: CGPoint(x: 100, y: 115))
+        view.keyDown(with: try stage.key(117))
+        #expect(interaction.marks.isEmpty)
+        #expect(view.performKeyEquivalent(with: try stage.key(6, "z", flags: .command)))
+
+        // Done with a selected mark: the result has the marks at their final places (row 23).
+        try stage.click(at: CGPoint(x: 100, y: 115))
+        #expect(interaction.selectedMark != nil)
+        try stage.press("Done")
+        guard case .done(let result)? = stage.outcomes.first, stage.outcomes.count == 1 else {
+            Issue.record("Done must report one done")
+            return
+        }
+        #expect(result.marks.marks.map(\.frame) == [CGRect(x: 50, y: 25, width: 110, height: 60)])
     }
 
     // MARK: The click on a window (YAZ-2769)

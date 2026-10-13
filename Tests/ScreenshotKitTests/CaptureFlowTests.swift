@@ -131,6 +131,8 @@ import Testing
         interaction.pointerDown(at: CGPoint(x: 20, y: 10), on: displayID)
         interaction.pointerUp(at: CGPoint(x: 150, y: 70))
         interaction.selectTool(.rectangle)
+        // Medium: a line of 4 points has whole pixels at each scale. The first size is Thick (7 points).
+        interaction.setSize(.medium)
         interaction.pointerDown(at: CGPoint(x: 40, y: 20), on: displayID)
         interaction.pointerDragged(to: CGPoint(x: 70, y: 30))
         interaction.pointerUp(at: CGPoint(x: 100, y: 50))
@@ -171,6 +173,79 @@ import Testing
         #expect(pixels[pixels.width - 1, pixels.height - 1] == original(pixels.width - 1, pixels.height - 1))
         #expect(pixels[middleColumn, middleRow] == original(middleColumn, middleRow))
 
+        // The private pasteboard holds the same PNG.
+        #expect(sandbox.pasteboard.data(forType: .png) == saved.data)
+    }
+
+    /// YAZ-2782: draw a red rectangle, move it with "Select", press Enter while it is still selected.
+    /// The PNG has the red pixels at the new place and the original pixels at the old place, and
+    /// it has no outline and no handle. The test runs at scale 2 and at scale 1.
+    @Test(arguments: [
+        (FakeScreenCapture.retinaID, 2),
+        (FakeScreenCapture.plainID, 1),
+    ])
+    func aRectangleThatWasMovedWithSelectIsSavedAtItsNewPlaceWithNoOutline(displayID: CGDirectDisplayID, scale: Int) async throws {
+        let sandbox = try Sandbox()
+        let saver = ScreenshotSaver(pasteboard: sandbox.pasteboard, folder: sandbox.folder)
+        let interaction = CaptureInteraction(displays: try await FakeScreenCapture().freezeAllDisplays(), styles: ToolStyleMemory())
+        var outcome: CaptureOutcome?
+        interaction.onFinish = { outcome = $0 }
+
+        // The box: x 20 to 150, y 10 to 70. The rectangle in it: x 20 to 80, y 10 to 40 of the box.
+        interaction.pointerDown(at: CGPoint(x: 20, y: 10), on: displayID)
+        interaction.pointerUp(at: CGPoint(x: 150, y: 70))
+        interaction.selectTool(.rectangle)
+        // Medium: a line of 4 points has whole pixels at each scale.
+        interaction.setSize(.medium)
+        interaction.pointerDown(at: CGPoint(x: 40, y: 20), on: displayID)
+        interaction.pointerUp(at: CGPoint(x: 100, y: 50))
+
+        // "Select": a drag from the left line of the rectangle moves it by 30, 10.
+        // Now it is x 50 to 110, y 20 to 50 of the box.
+        interaction.toggleSelecting()
+        interaction.pointerDown(at: CGPoint(x: 40, y: 35), on: displayID)
+        interaction.pointerDragged(to: CGPoint(x: 55, y: 40))
+        interaction.pointerUp(at: CGPoint(x: 70, y: 45))
+        #expect(interaction.marks.marks.map(\.frame) == [CGRect(x: 50, y: 20, width: 60, height: 30)])
+        // The mark is still selected, so the overlay shows its outline and its eight handles now.
+        #expect(interaction.selectedMark?.handles.count == 8)
+        #expect(interaction.selection(on: displayID)?.rect == CGRect(x: 20, y: 10, width: 130, height: 60))
+        interaction.key(.enter)
+
+        try saver.deliver(try #require(outcome), date: day)
+        saver.waitForPendingWrites()
+        let saved = try savedImage(in: sandbox)
+        #expect(saved.image.width == 130 * scale && saved.image.height == 60 * scale)
+        let pixels = PixelReader(saved.image)
+        let red = Pixel(.red)
+
+        // The line is 4 points wide around the rectangle at its new place.
+        func isOnTheLine(_ x: Int, _ y: Int) -> Bool {
+            let isInOuterEdge = (48 * scale..<112 * scale).contains(x) && (18 * scale..<52 * scale).contains(y)
+            let isInInnerEdge = (52 * scale..<108 * scale).contains(x) && (22 * scale..<48 * scale).contains(y)
+            return isInOuterEdge && !isInInnerEdge
+        }
+        // Each pixel on the line is red. Each other pixel is the pixel of the frozen image: the
+        // old place of the rectangle, the place of the outline, and the places of the handles.
+        var redPixels = 0
+        for y in 0..<pixels.height {
+            for x in 0..<pixels.width {
+                if isOnTheLine(x, y) {
+                    redPixels += 1
+                    if !pixels[x, y].isNear(red) {
+                        Issue.record("The pixel \(x), \(y) is on the line, but it is \(pixels[x, y])")
+                        return
+                    }
+                } else if pixels[x, y] != patternPixel(x: 20 * scale + x, y: 10 * scale + y) {
+                    Issue.record("The pixel \(x), \(y) is not on the line, but it changed to \(pixels[x, y])")
+                    return
+                }
+            }
+        }
+        #expect(redPixels == 720 * scale * scale) // 64 by 34 points without the inside of 56 by 26 points
+        // The old place: the middle of its left line and its top-left corner.
+        #expect(pixels[20 * scale, 25 * scale] == patternPixel(x: 40 * scale, y: 35 * scale))
+        #expect(pixels[20 * scale, 10 * scale] == patternPixel(x: 40 * scale, y: 20 * scale))
         // The private pasteboard holds the same PNG.
         #expect(sandbox.pasteboard.data(forType: .png) == saved.data)
     }
