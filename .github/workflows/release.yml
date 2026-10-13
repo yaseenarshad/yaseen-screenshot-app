@@ -1,0 +1,117 @@
+# Release build: on a `v*` tag push (or a manual dispatch with a tag), build the app on an
+# Apple Silicon Mac of GitHub, sign it, make the .dmg, and attach the .dmg to the GitHub
+# release for that tag. The workflow makes the release if it does not exist.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and attach the .dmg to (e.g. v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-26
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ github.event.inputs.tag || github.ref_name }}
+
+      - name: Check that the tag is the version in Support/Info.plist
+        run: |
+          PLIST_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Support/Info.plist)"
+          if [ "$TAG" != "v$PLIST_VERSION" ]; then
+            echo "::error title=Version mismatch::The tag is $TAG, but Support/Info.plist has the version $PLIST_VERSION. The tag must be v$PLIST_VERSION."
+            exit 1
+          fi
+          echo "The tag $TAG is the version in Support/Info.plist."
+
+      - name: Select the newest Xcode on the runner
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_*.app | grep -v -i -E 'beta|candidate' | sort -V | tail -n 1)"
+          echo "Selected: $XCODE"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+
+      - name: Print the tool versions
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      # A step cannot read `secrets` in its `if:`. This step reads them and sets an output.
+      - name: Find out if the signing secrets are set
+        id: cert
+        env:
+          SIGN_CERT_P12_BASE64: ${{ secrets.SIGN_CERT_P12_BASE64 }}
+          SIGN_CERT_PASSWORD: ${{ secrets.SIGN_CERT_PASSWORD }}
+        run: |
+          if [ -n "$SIGN_CERT_P12_BASE64" ] && [ -n "$SIGN_CERT_PASSWORD" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "The signing secrets are set."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Ad-hoc signature::The secrets SIGN_CERT_P12_BASE64 and SIGN_CERT_PASSWORD are not both set. This build has an ad-hoc signature. macOS will not keep the Screen Recording permission after an update to this build."
+          fi
+
+      - name: Import the certificate into a temporary keychain
+        if: steps.cert.outputs.available == 'true'
+        env:
+          SIGN_CERT_P12_BASE64: ${{ secrets.SIGN_CERT_P12_BASE64 }}
+          SIGN_CERT_PASSWORD: ${{ secrets.SIGN_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          CERT_FILE="$RUNNER_TEMP/signing-cert.p12"
+
+          printf '%s' "$SIGN_CERT_P12_BASE64" | base64 --decode > "$CERT_FILE"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$CERT_FILE" -f pkcs12 -P "$SIGN_CERT_PASSWORD" -k "$KEYCHAIN" -T /usr/bin/codesign
+          # Without this, codesign shows a window that asks for the key, and the job hangs.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          # Put the temporary keychain first in the search list, so codesign finds the certificate.
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$CERT_FILE"
+
+          security find-identity -p codesigning "$KEYCHAIN"
+
+      - name: Build, sign, and make the .dmg
+        env:
+          # With the secrets, a missing certificate is an error, not a silent ad-hoc signature.
+          REQUIRE_SIGN_IDENTITY: ${{ steps.cert.outputs.available == 'true' && '1' || '0' }}
+        run: scripts/bundle.sh --dmg
+
+      - name: Show the signature
+        run: |
+          codesign -dv "build/Yaseen Screenshot.app"
+          codesign -d -r- "build/Yaseen Screenshot.app"
+
+      - name: Attach the .dmg to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          VERSION="${TAG#v}"
+          DMG="build/Yaseen-Screenshot-$VERSION-arm64.dmg"
+          if [ ! -f "$DMG" ]; then
+            echo "::error::The file $DMG does not exist."
+            exit 1
+          fi
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" "$DMG" --clobber
+
+      - name: Delete the temporary keychain
+        if: always() && steps.cert.outputs.available == 'true'
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
