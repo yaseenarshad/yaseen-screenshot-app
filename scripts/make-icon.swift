@@ -32,57 +32,45 @@ func drawIcon(pixels: Int) -> NSBitmapImageRep {
     // All the numbers below are for a 1024 canvas. `u` scales them.
     let u = CGFloat(pixels) / 1024.0
 
-    // The background: a rounded square on the icon grid of macOS (824 of 1024).
+    // The background: a rounded square on the icon grid of macOS (824 of 1024),
+    // in the indigo of the Yaseen Docs and Yaseen Draw icons.
     let body = NSRect(x: 100 * u, y: 100 * u, width: 824 * u, height: 824 * u)
-    let background = NSBezierPath(roundedRect: body, xRadius: 185 * u, yRadius: 185 * u)
-    let gradient = NSGradient(
-        starting: NSColor(srgbRed: 0.24, green: 0.60, blue: 1.00, alpha: 1),
-        ending: NSColor(srgbRed: 0.05, green: 0.30, blue: 0.85, alpha: 1)
-    )!
-    gradient.draw(in: background, angle: -90)
+    NSColor(srgbRed: 0.42, green: 0.40, blue: 0.88, alpha: 1).setFill()
+    NSBezierPath(roundedRect: body, xRadius: 185 * u, yRadius: 185 * u).fill()
 
     NSColor.white.setStroke()
-    NSColor.white.setFill()
 
-    // The glyph: the four corners of a selection box.
-    let box = NSRect(x: 290 * u, y: 290 * u, width: 444 * u, height: 444 * u)
-    let arm = 130 * u
-    let corners = NSBezierPath()
-    corners.lineWidth = 56 * u
-    corners.lineCapStyle = .round
-    corners.lineJoinStyle = .round
+    // The glyph is a "Y" that is also a selection box. The two arms of the Y go
+    // to the top corners of the box. The bottom corners are the crop marks of a screenshot.
+    let box = NSRect(x: 262 * u, y: 262 * u, width: 500 * u, height: 500 * u)
+    let arm = 120 * u
+
+    let cropMarks = NSBezierPath()
+    cropMarks.lineWidth = 50 * u
+    cropMarks.lineCapStyle = .round
+    cropMarks.lineJoinStyle = .round
     // Bottom left.
-    corners.move(to: NSPoint(x: box.minX, y: box.minY + arm))
-    corners.line(to: NSPoint(x: box.minX, y: box.minY))
-    corners.line(to: NSPoint(x: box.minX + arm, y: box.minY))
+    cropMarks.move(to: NSPoint(x: box.minX, y: box.minY + arm))
+    cropMarks.line(to: NSPoint(x: box.minX, y: box.minY))
+    cropMarks.line(to: NSPoint(x: box.minX + arm, y: box.minY))
     // Bottom right.
-    corners.move(to: NSPoint(x: box.maxX - arm, y: box.minY))
-    corners.line(to: NSPoint(x: box.maxX, y: box.minY))
-    corners.line(to: NSPoint(x: box.maxX, y: box.minY + arm))
-    // Top right.
-    corners.move(to: NSPoint(x: box.maxX, y: box.maxY - arm))
-    corners.line(to: NSPoint(x: box.maxX, y: box.maxY))
-    corners.line(to: NSPoint(x: box.maxX - arm, y: box.maxY))
-    // Top left.
-    corners.move(to: NSPoint(x: box.minX + arm, y: box.maxY))
-    corners.line(to: NSPoint(x: box.minX, y: box.maxY))
-    corners.line(to: NSPoint(x: box.minX, y: box.maxY - arm))
-    corners.stroke()
+    cropMarks.move(to: NSPoint(x: box.maxX - arm, y: box.minY))
+    cropMarks.line(to: NSPoint(x: box.maxX, y: box.minY))
+    cropMarks.line(to: NSPoint(x: box.maxX, y: box.minY + arm))
+    cropMarks.stroke()
 
-    // The lens: a ring with a dot in the middle of the box.
-    let ringRadius = 92 * u
-    let ring = NSBezierPath(ovalIn: NSRect(
-        x: box.midX - ringRadius, y: box.midY - ringRadius,
-        width: ringRadius * 2, height: ringRadius * 2
-    ))
-    ring.lineWidth = 44 * u
-    ring.stroke()
-
-    let dotRadius = 26 * u
-    NSBezierPath(ovalIn: NSRect(
-        x: box.midX - dotRadius, y: box.midY - dotRadius,
-        width: dotRadius * 2, height: dotRadius * 2
-    )).fill()
+    let letter = NSBezierPath()
+    letter.lineWidth = 62 * u
+    letter.lineCapStyle = .round
+    letter.lineJoinStyle = .round
+    let fork = NSPoint(x: box.midX, y: 500 * u)
+    letter.move(to: NSPoint(x: box.minX, y: box.maxY))
+    letter.line(to: fork)
+    letter.move(to: NSPoint(x: box.maxX, y: box.maxY))
+    letter.line(to: fork)
+    letter.move(to: fork)
+    letter.line(to: NSPoint(x: box.midX, y: box.minY))
+    letter.stroke()
 
     return rep
 }
