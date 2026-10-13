@@ -9,8 +9,9 @@ final class StatusMenu: NSObject {
     var onQuit: () -> Void = {}
 
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    private let takeScreenshotRow = NSMenuItem(title: "Take screenshot", action: #selector(takeScreenshot), keyEquivalent: "")
 
-    override init() {
+    init(hotKey: HotKeyCombo) {
         super.init()
 
         // A template image: macOS colours it for a light and for a dark menu bar.
@@ -19,12 +20,20 @@ final class StatusMenu: NSObject {
         statusItem.button?.image = icon
 
         let menu = NSMenu()
-        menu.addItem(row("Take screenshot", #selector(takeScreenshot)))
+        takeScreenshotRow.target = self
+        showHotKey(hotKey)
+        menu.addItem(takeScreenshotRow)
         menu.addItem(row("Open screenshots folder", #selector(openFolder)))
         menu.addItem(row("Settings…", #selector(openSettings), key: ","))
         menu.addItem(.separator())
         menu.addItem(row("Quit", #selector(quit), key: "q"))
         statusItem.menu = menu
+    }
+
+    /// "Take screenshot" shows the hotkey on its right side, as a menu shows a key equivalent.
+    func showHotKey(_ hotKey: HotKeyCombo) {
+        takeScreenshotRow.keyEquivalent = hotKey.menuKeyEquivalent
+        takeScreenshotRow.keyEquivalentModifierMask = hotKey.modifiers
     }
 
     private func row(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
