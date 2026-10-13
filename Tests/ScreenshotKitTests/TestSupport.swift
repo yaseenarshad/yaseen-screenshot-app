@@ -19,10 +19,15 @@ func patternPixel(x: Int, y: Int) -> Pixel {
 }
 
 func makePatternImage(width: Int, height: Int) -> CGImage {
+    makeImage(width: width, height: height, pixel: patternPixel)
+}
+
+/// An image with the colour that `pixel` gives for each pixel (top-left origin).
+func makeImage(width: Int, height: Int, pixel: (_ x: Int, _ y: Int) -> Pixel) -> CGImage {
     var bytes = [UInt8](repeating: 255, count: width * height * 4)
     for y in 0..<height {
         for x in 0..<width {
-            let pixel = patternPixel(x: x, y: y)
+            let pixel = pixel(x, y)
             let offset = (y * width + x) * 4
             bytes[offset] = pixel.red
             bytes[offset + 1] = pixel.green
@@ -42,6 +47,28 @@ func makePatternImage(width: Int, height: Int) -> CGImage {
         shouldInterpolate: false,
         intent: .defaultIntent
     )!
+}
+
+extension Pixel {
+    static let white = Pixel(red: 255, green: 255, blue: 255)
+    static let black = Pixel(red: 0, green: 0, blue: 0)
+
+    /// The colour of a mark, as a pixel.
+    init(_ color: MarkColor) {
+        let parts = color.components
+        self.init(
+            red: UInt8((parts.red * 255).rounded()),
+            green: UInt8((parts.green * 255).rounded()),
+            blue: UInt8((parts.blue * 255).rounded())
+        )
+    }
+
+    /// True when each part differs by `tolerance` at most. A drawn edge is not exact to the last bit.
+    func isNear(_ other: Pixel, tolerance: Int = 3) -> Bool {
+        abs(Int(red) - Int(other.red)) <= tolerance
+            && abs(Int(green) - Int(other.green)) <= tolerance
+            && abs(Int(blue) - Int(other.blue)) <= tolerance
+    }
 }
 
 /// Reads one pixel of an image (top-left origin).
