@@ -3,7 +3,7 @@ import ServiceManagement
 
 /// "Open at login" of macOS.
 ///
-/// This is a protocol for one reason: the tests and `swift run` must never register a real login item.
+/// This is a protocol for one reason: the tests must never register a real login item.
 public protocol LoginItem {
     /// False when the app does not run from a `.app` bundle. Then macOS has nothing to register.
     var isAvailable: Bool { get }

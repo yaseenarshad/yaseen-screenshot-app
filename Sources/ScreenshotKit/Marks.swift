@@ -381,7 +381,6 @@ public struct MarkList: Equatable {
         return true
     }
 
-    /// Removes the mark at `index`.
     public mutating func remove(at index: Int) {
         guard marks.indices.contains(index) else { return }
         var changed = marks

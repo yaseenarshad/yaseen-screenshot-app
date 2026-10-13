@@ -9,9 +9,6 @@ public final class AppController: NSObject, NSApplicationDelegate {
     /// The time between a click on "Take screenshot" and the capture. The menu must be gone from the image.
     private static let menuCloseDelay: TimeInterval = 0.2
 
-    /// What "Settings…" does. The default opens the settings window.
-    public lazy var openSettings: () -> Void = { [weak self] in self?.showSettingsWindow() }
-
     private let capturer: ScreenCapturing
     private let saver: ScreenshotSaver
     private let hotKeyCenter = HotKeyCenter()
@@ -34,8 +31,6 @@ public final class AppController: NSObject, NSApplicationDelegate {
         self.capturer = capturer
         self.saver = saver
         settings = SettingsModel(store: store, hotKeys: hotKeyCenter, loginItem: loginItem)
-        // The stored folder wins over the folder that the saver came with.
-        saver.folder = store.saveFolder
     }
 
     /// Starts the app with the real screen, the real clipboard and the stored settings. It does not return.
@@ -65,7 +60,8 @@ public final class AppController: NSObject, NSApplicationDelegate {
             return
         }
 
-        let menu = StatusMenu(hotKey: settings.hotKey)
+        // macOS keeps the place of the menu bar icon in the preferences of the app itself.
+        let menu = StatusMenu(hotKey: settings.hotKey, defaults: .standard)
         menu.onTakeScreenshot = { [weak self] in
             DispatchQueue.main.asyncAfter(deadline: .now() + AppController.menuCloseDelay) {
                 self?.startCapture()
@@ -75,7 +71,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
             guard let self = self else { return }
             NSWorkspace.shared.open(self.saver.folder)
         }
-        menu.onOpenSettings = { [weak self] in self?.openSettings() }
+        menu.onOpenSettings = { [weak self] in self?.showSettingsWindow() }
         menu.onQuit = { NSApp.terminate(nil) }
         statusMenu = menu
 

@@ -23,7 +23,6 @@ final class OverlayWindow: NSPanel {
         // The overlay needs the keyboard at once, and it must stay.
         becomesKeyOnlyIfNeeded = false
         hidesOnDeactivate = false
-        isFloatingPanel = false
         isOpaque = true
         backgroundColor = .black
         hasShadow = false
@@ -34,8 +33,6 @@ final class OverlayWindow: NSPanel {
         // Each window sends its keys to its view, also the window that gets the keyboard after a click.
         initialFirstResponder = overlayView
         makeFirstResponder(overlayView)
-        // `isFloatingPanel` changes the level, so the level is set again after it.
-        level = .screenSaver
         setFrame(display.frame, display: false)
     }
 

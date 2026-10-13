@@ -14,7 +14,7 @@ struct SettingsView: View {
                     // The hotkey field: a click starts the recording, a second click stops it.
                     // The window controller gives the keys to the model while the field records.
                     Button(action: toggleRecording) {
-                        Text(model.isRecording ? "Type a shortcut" : model.hotKey.text)
+                        Text(model.isRecording ? "Type a hotkey" : model.hotKey.text)
                             .frame(minWidth: 120)
                     }
                     if let problem = model.hotKeyProblem {

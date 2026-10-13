@@ -106,7 +106,7 @@ private final class FakeLoginItem: LoginItem {
             model.startRecording()
             #expect(model.keyDown(controlOptionS) == true)
             #expect(!model.isRecording)
-            #expect(model.hotKeyProblem == "That shortcut is in use.")
+            #expect(model.hotKeyProblem == "That hotkey is in use.")
             #expect(model.hotKey == .shiftCommandD)
             #expect(hotKeys.registered == .shiftCommandD)
             #expect(SettingsStore(defaults: defaults).hotKey == .shiftCommandD)
@@ -122,7 +122,7 @@ private final class FakeLoginItem: LoginItem {
             hotKeys.refused = [.shiftCommandD]
             let atStart = SettingsModel(store: SettingsStore(defaults: defaults), hotKeys: hotKeys, loginItem: FakeLoginItem())
             atStart.registerHotKey()
-            #expect(atStart.hotKeyProblem == "That shortcut is in use.")
+            #expect(atStart.hotKeyProblem == "That hotkey is in use.")
             #expect(atStart.hotKey == .shiftCommandD)
             // A different combination still works then.
             atStart.startRecording()

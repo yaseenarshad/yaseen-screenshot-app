@@ -10,16 +10,9 @@ final class CaptureSession {
     private var windows: [OverlayWindow] = []
     private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
     private var previousApp: NSRunningApplication?
-    private let windowList: WindowListing
 
-    /// `windowList` gives the windows that a click can select. A test gives a fixed list.
-    init(
-        displays: [FrozenDisplay],
-        windowList: WindowListing = SystemWindowList(),
-        onEnd: @escaping (CaptureOutcome) -> Void
-    ) {
+    init(displays: [FrozenDisplay], onEnd: @escaping (CaptureOutcome) -> Void) {
         self.interaction = CaptureInteraction(displays: displays)
-        self.windowList = windowList
         self.onEnd = onEnd
     }
 
@@ -73,7 +66,7 @@ final class CaptureSession {
     private func readWindows() {
         guard !windows.isEmpty else { return } // the capture ended already
         interaction.setWindows(WindowSnap.framesByDisplay(
-            windows: windowList.windowsOnScreen(),
+            windows: SystemWindowList.windowsOnScreen(),
             displays: interaction.displays,
             excludingPID: ProcessInfo.processInfo.processIdentifier
         ))
