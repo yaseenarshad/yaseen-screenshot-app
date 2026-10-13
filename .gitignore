@@ -1,0 +1,18 @@
+# Swift package build output
+.build/
+.swiftpm/
+
+# App bundle and installer output
+build/
+*.dmg
+
+# macOS
+.DS_Store
+
+# Xcode
+DerivedData/
+xcuserdata/
+
+# Local agent files and working notes stay on this computer.
+.claude/*
+thoughts/
