@@ -19,17 +19,10 @@ public struct WindowInfo: Equatable {
     }
 }
 
-/// The source of the window list. The tests use a fixed list.
-public protocol WindowListing {
+/// The window list of the window server. It needs no title, so it needs no permission.
+public enum SystemWindowList {
     /// The windows that are on the screens now, from the front to the back.
-    func windowsOnScreen() -> [WindowInfo]
-}
-
-/// The real list, from the window server. It needs no title, so it needs no permission.
-public struct SystemWindowList: WindowListing {
-    public init() {}
-
-    public func windowsOnScreen() -> [WindowInfo] {
+    public static func windowsOnScreen() -> [WindowInfo] {
         let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
         guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else { return [] }
         return list.compactMap { entry in

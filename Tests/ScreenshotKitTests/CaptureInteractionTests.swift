@@ -82,7 +82,6 @@ import Testing
         harness.drag(from: CGPoint(x: 150, y: 20), to: CGPoint(x: 420, y: 60), on: retina)
         #expect(harness.interaction.selection(on: retina)?.rect == CGRect(x: 150, y: 20, width: 50, height: 40))
         #expect(harness.interaction.selection(on: plain) == nil)
-        #expect(harness.interaction.selectionDisplayID == retina)
     }
 
     @Test func aNewDragReplacesTheBoxAndOnlyOneBoxExists() async throws {

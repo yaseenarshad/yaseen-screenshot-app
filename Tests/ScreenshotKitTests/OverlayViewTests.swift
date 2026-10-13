@@ -2,6 +2,14 @@ import AppKit
 @testable import ScreenshotKit
 import Testing
 
+extension Toolbar {
+    /// The button with the given name ("Rectangle", "Undo", "Thick", "Blue" and so on). The sizes
+    /// and the colours are in a row view, one level below the buttons of the main row.
+    func button(named name: String) -> NSButton? {
+        (subviews + subviews.flatMap(\.subviews)).compactMap { $0 as? ToolbarButton }.first { $0.name == name }
+    }
+}
+
 /// The view adapter, out of sight. The test hands `NSEvent` objects to the view (it posts no
 /// event to macOS) and draws the layers of the view into a bitmap. No window is shown.
 @MainActor @Suite struct OverlayViewTests {
@@ -325,7 +333,8 @@ import Testing
         let names = ["Select", "Rectangle", "Ellipse", "Arrow", "Pen", "Highlight", "Text", "Undo", "Cancel", "Done"]
         let buttons = try names.map { try #require(toolbar.button(named: $0)) }
         #expect(buttons.map(\.frame.minX) == buttons.map(\.frame.minX).sorted())
-        #expect(buttons.allSatisfy { $0.image != nil && $0.superview === toolbar })
+        // Each button has its symbol. A symbol name that macOS does not have gives an empty picture.
+        #expect(buttons.allSatisfy { ($0.image?.size.width ?? 0) > 0 && $0.superview === toolbar })
         #expect(toolbar.button(named: "Undo")?.isEnabled == false)
 
         // The row with the sizes and the colours shows only when a tool is selected.
@@ -434,7 +443,7 @@ import Testing
         // A panel that takes the keyboard with no app switch, and stays when the app is not active.
         #expect(panel.styleMask.contains(.nonactivatingPanel) && !panel.styleMask.contains(.titled))
         #expect(panel.canBecomeKey && !panel.becomesKeyOnlyIfNeeded && !panel.hidesOnDeactivate)
-        #expect(panel.level == .screenSaver)
+        #expect(panel.level == .screenSaver && !panel.isFloatingPanel)
         #expect(panel.collectionBehavior.contains([.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]))
         #expect(panel.contentView === view && panel.firstResponder === view)
 
@@ -551,7 +560,7 @@ import Testing
         let select = try #require(toolbar.button(named: "Select") as? ToolbarButton)
         let rectangleButton = try #require(toolbar.button(named: "Rectangle") as? ToolbarButton)
         #expect(select.frame.minX == 4 && rectangleButton.frame.minX == 34)
-        #expect(NSImage(systemSymbolName: "cursorarrow", accessibilityDescription: nil) != nil && select.image != nil)
+        #expect(select.image?.accessibilityDescription == "Select")
         let tip = try #require(toolbar.subviews.compactMap { $0 as? NSTextField }.first)
         select.mouseEntered(with: try #require(NSEvent.enterExitEvent(
             with: .mouseEntered, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,

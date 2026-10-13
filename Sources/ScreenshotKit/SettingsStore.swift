@@ -2,7 +2,7 @@ import AppKit
 
 /// The three settings of the app (D10), in `UserDefaults`.
 ///
-/// The `UserDefaults` is a parameter, so a test uses its own suite and removes it after.
+/// The `UserDefaults` is a parameter, so a test gives one that keeps its values in memory.
 /// A value that is missing or broken gives the default. The store never fails.
 public final class SettingsStore {
     private enum Key {

@@ -112,15 +112,6 @@ final class Toolbar: NSView {
         if frame.size != size { setFrameSize(size) }
     }
 
-    /// The button with the given name ("Rectangle", "Undo", "Thick", "Blue" and so on).
-    func button(named name: String) -> NSButton? {
-        allButtons.first { $0.name == name }
-    }
-
-    private var allButtons: [ToolbarButton] {
-        (subviews + optionsRow.subviews).compactMap { $0 as? ToolbarButton }
-    }
-
     // MARK: The buttons
 
     private func makeButton(_ name: String, image: NSImage, onClick: @escaping () -> Void) -> ToolbarButton {
@@ -180,22 +171,9 @@ final class Toolbar: NSView {
     }
 
     private static func symbol(_ symbolName: String, name: String) -> NSImage {
-        let configuration = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-        if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: name)?
-            .withSymbolConfiguration(configuration) {
-            return image
-        }
-        // A system with no such symbol shows the first letter of the name.
-        let letter = NSAttributedString(
-            string: String(name.prefix(1)),
-            attributes: [.font: NSFont.systemFont(ofSize: 14, weight: .medium), .foregroundColor: NSColor.black]
-        )
-        let image = NSImage(size: letter.size(), flipped: false) { _ in
-            letter.draw(at: .zero)
-            return true
-        }
-        image.isTemplate = true
-        return image
+        // Each symbol of the toolbar is in macOS 11 and later, and the app needs macOS 14.
+        NSImage(systemSymbolName: symbolName, accessibilityDescription: name)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)) ?? NSImage()
     }
 
     /// The picture of a size: a dot that grows with the size.

@@ -125,11 +125,6 @@ public final class CaptureInteraction {
         box?.display.displayID == displayID ? box?.selection : nil
     }
 
-    /// The screen that has the box.
-    public var selectionDisplayID: CGDirectDisplayID? {
-        box?.display.displayID
-    }
-
     /// The text "Drag to select" shows on every screen while no box exists.
     public var showsHint: Bool {
         box == nil
