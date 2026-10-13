@@ -49,8 +49,8 @@ public struct Selection: Equatable {
     /// The box between the two ends of a drag, in any direction.
     /// The box stays inside a screen of `screenSize` points.
     public init(from start: CGPoint, to end: CGPoint, in screenSize: CGSize) {
-        let x = Selection.span(fixed: start.x, moving: end.x, limit: screenSize.width)
-        let y = Selection.span(fixed: start.y, moving: end.y, limit: screenSize.height)
+        let x = Selection.span(fixed: start.x.rounded(), moving: end.x.rounded(), limit: screenSize.width)
+        let y = Selection.span(fixed: start.y.rounded(), moving: end.y.rounded(), limit: screenSize.height)
         rect = CGRect(x: x.origin, y: y.origin, width: x.length, height: y.length)
     }
 
@@ -83,25 +83,58 @@ public struct Selection: Equatable {
 
     /// The middle of a handle: a corner of the box, or the middle of an edge.
     public func handlePoint(_ handle: Handle) -> CGPoint {
+        Selection.handlePoint(handle, of: rect)
+    }
+
+    /// What a pointer down at `point` takes: the nearest handle, else the inside, else nothing.
+    public func part(at point: CGPoint) -> SelectionPart? {
+        let handles = Handle.allCases.map { (key: $0, point: handlePoint($0)) }
+        if let nearest = Selection.nearest(of: handles, to: point) { return .handle(nearest.key) }
+        return contains(point) ? .inside : nil
+    }
+
+    // The same geometry for any rectangle. The box uses it, and a Rectangle mark and an Ellipse
+    // mark use it for their handles (YAZ-2782).
+
+    /// The middle of a handle of `rect`: a corner, or the middle of an edge.
+    static func handlePoint(_ handle: Handle, of rect: CGRect) -> CGPoint {
         CGPoint(
             x: handle.horizontal < 0 ? rect.minX : handle.horizontal > 0 ? rect.maxX : rect.midX,
             y: handle.vertical < 0 ? rect.minY : handle.vertical > 0 ? rect.maxY : rect.midY
         )
     }
 
-    /// What a pointer down at `point` takes: the nearest handle, else the inside, else nothing.
-    public func part(at point: CGPoint) -> SelectionPart? {
-        let reach = Selection.handleHitSide / 2
-        var nearest: (handle: Handle, distance: CGFloat)?
-        for handle in Handle.allCases {
-            let middle = handlePoint(handle)
-            let distance = max(abs(point.x - middle.x), abs(point.y - middle.y))
+    /// The handle that a pointer down at `point` takes: the nearest handle that has the point in
+    /// its hit area. The first handle wins when two are equally near.
+    static func nearest<Key>(of handles: [(key: Key, point: CGPoint)], to point: CGPoint) -> (key: Key, point: CGPoint)? {
+        let reach = handleHitSide / 2
+        var nearest: (handle: (key: Key, point: CGPoint), distance: CGFloat)?
+        for handle in handles {
+            let distance = max(abs(point.x - handle.point.x), abs(point.y - handle.point.y))
             if distance <= reach, distance < nearest?.distance ?? .infinity {
                 nearest = (handle, distance)
             }
         }
-        if let nearest = nearest { return .handle(nearest.handle) }
-        return contains(point) ? .inside : nil
+        return nearest?.handle
+    }
+
+    /// `rect` after `handle` moved to `point`, inside an area of `size`. The opposite edges stay
+    /// in place. A handle that goes through the opposite edge turns the rectangle over.
+    static func resized(_ rect: CGRect, by handle: Handle, to point: CGPoint, in size: CGSize) -> CGRect {
+        var resized = rect
+        if handle.horizontal != 0 {
+            let fixed = handle.horizontal < 0 ? rect.maxX : rect.minX
+            let x = span(fixed: fixed, moving: point.x, limit: size.width)
+            resized.origin.x = x.origin
+            resized.size.width = x.length
+        }
+        if handle.vertical != 0 {
+            let fixed = handle.vertical < 0 ? rect.maxY : rect.minY
+            let y = span(fixed: fixed, moving: point.y, limit: size.height)
+            resized.origin.y = y.origin
+            resized.size.height = y.length
+        }
+        return resized
     }
 
     // MARK: Move and size change
@@ -118,29 +151,20 @@ public struct Selection: Equatable {
     /// A handle that goes through the opposite edge turns the box over.
     public func resized(_ handle: Handle, to point: CGPoint, in screenSize: CGSize) -> Selection {
         var resized = self
-        if handle.horizontal != 0 {
-            let fixed = handle.horizontal < 0 ? rect.maxX : rect.minX
-            let x = Selection.span(fixed: fixed, moving: point.x, limit: screenSize.width)
-            resized.rect.origin.x = x.origin
-            resized.rect.size.width = x.length
-        }
-        if handle.vertical != 0 {
-            let fixed = handle.vertical < 0 ? rect.maxY : rect.minY
-            let y = Selection.span(fixed: fixed, moving: point.y, limit: screenSize.height)
-            resized.rect.origin.y = y.origin
-            resized.rect.size.height = y.length
-        }
+        // The box stays on whole points. Its edges are whole already, so only the pointer is rounded.
+        let whole = CGPoint(x: point.x.rounded(), y: point.y.rounded())
+        resized.rect = Selection.resized(rect, by: handle, to: whole, in: screenSize)
         return resized
     }
 
-    /// One axis of a box, between an edge that stays and an edge that follows the pointer.
-    /// The result is on whole points, inside `0...limit`, and at least `minimumSide` long.
+    /// One axis of a rectangle, between an edge that stays and an edge that follows the pointer.
+    /// The result is inside `0...limit`, and at least `minimumSide` long.
     private static func span(fixed: CGFloat, moving: CGFloat, limit: CGFloat) -> (origin: CGFloat, length: CGFloat) {
-        let a = min(max(fixed.rounded(), 0), limit)
-        let b = min(max(moving.rounded(), 0), limit)
+        let a = min(max(fixed, 0), limit)
+        let b = min(max(moving, 0), limit)
         let length = max(abs(b - a), minimumSide)
-        // A short box grows from the fixed edge towards the pointer. At the edge of the screen
-        // it moves back in.
+        // A short rectangle grows from the fixed edge towards the pointer. At the edge of the
+        // area it moves back in.
         let origin = b < a ? a - length : a
         return (min(max(origin, 0), max(limit - length, 0)), length)
     }

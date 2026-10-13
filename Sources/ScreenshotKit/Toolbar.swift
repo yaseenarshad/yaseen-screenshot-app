@@ -1,7 +1,8 @@
 import AppKit
 
-/// The toolbar of the box (D8): the six tools, Undo, Cancel and Done. A second row with the three
-/// sizes and the six colours shows while a tool is selected.
+/// The toolbar of the box (D8): Select, the six tools, Undo, Cancel and Done. A second row with
+/// the three sizes and the six colours shows while a tool is selected, and with Select while a
+/// mark is selected.
 ///
 /// A thin adapter: a click calls `CaptureInteraction`, and `refresh()` shows the state that it reads there.
 final class Toolbar: NSView {
@@ -14,6 +15,7 @@ final class Toolbar: NSView {
     static let tallestHeight = 2 * rowHeight
 
     private let interaction: CaptureInteraction
+    private var selectButton: ToolbarButton?
     private var toolButtons: [Tool: ToolbarButton] = [:]
     private var sizeButtons: [MarkSize: ToolbarButton] = [:]
     private var colorButtons: [MarkColor: ToolbarButton] = [:]
@@ -31,6 +33,11 @@ final class Toolbar: NSView {
         layer?.borderColor = CGColor(gray: 1, alpha: 0.18)
         layer?.borderWidth = 0.5
 
+        // "Select" is the first button (D15 on YAZ-2782). It is not a `Tool`: it draws no mark.
+        let select = makeButton("Select", image: Toolbar.symbol("cursorarrow", name: "Select")) {
+            [interaction] in interaction.toggleSelecting()
+        }
+        selectButton = select
         let tools = Tool.allCases.map { tool -> ToolbarButton in
             let button = makeButton(tool.name, image: Toolbar.symbol(Toolbar.symbolName(for: tool), name: tool.name)) {
                 [interaction] in interaction.selectTool(tool)
@@ -49,7 +56,7 @@ final class Toolbar: NSView {
             [interaction] in interaction.done()
         }
         done.contentTintColor = NSColor(srgbRed: 0.35, green: 0.85, blue: 0.45, alpha: 1)
-        width = layOut([tools, [undo], [cancel, done]], in: self)
+        width = layOut([[select] + tools, [undo], [cancel, done]], in: self)
 
         let sizes = MarkSize.allCases.map { size -> ToolbarButton in
             let button = makeButton(size.name, image: Toolbar.dot(for: size)) { [interaction] in interaction.setSize(size) }
@@ -90,6 +97,7 @@ final class Toolbar: NSView {
     /// Shows the state of the interaction: the selected tool, its size and colour, and the second row.
     func refresh() {
         let style = interaction.style
+        selectButton?.isOn = interaction.isSelecting
         for (tool, button) in toolButtons { button.isOn = tool == interaction.tool }
         for (size, button) in sizeButtons { button.isOn = size == style?.size }
         for (color, button) in colorButtons { button.isOn = color == style?.color }
