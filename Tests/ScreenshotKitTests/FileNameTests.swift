@@ -53,10 +53,12 @@ import Testing
         names += (1...300).map { snipFileName(date: day, number: $0) }
         #expect(names.count == 6_000)
 
+        // The other tests run at the same time and can take the processor for a moment.
+        // Thus the test uses the best of three measurements.
         var next = 0
-        let elapsed = ContinuousClock().measure {
-            next = nextSnipNumber(after: names, date: day)
-        }
+        let elapsed = (1...3).map { _ in
+            ContinuousClock().measure { next = nextSnipNumber(after: names, date: day) }
+        }.min()!
         #expect(next == 301)
         #expect(elapsed < .milliseconds(50), "6,000 names took \(elapsed)")
         print("FileNameTests: 6,000 names took \(elapsed)")
