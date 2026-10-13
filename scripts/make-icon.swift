@@ -40,8 +40,7 @@ func drawIcon(pixels: Int) -> NSBitmapImageRep {
 
     NSColor.white.setStroke()
 
-    // The glyph is a "Y" that is also a selection box. The two arms of the Y go
-    // to the top corners of the box. The bottom corners are the crop marks of a screenshot.
+    // The glyph: a "Y" in the middle of the four crop corners of a selection box.
     let box = NSRect(x: 262 * u, y: 262 * u, width: 500 * u, height: 500 * u)
     let arm = 120 * u
 
@@ -57,19 +56,29 @@ func drawIcon(pixels: Int) -> NSBitmapImageRep {
     cropMarks.move(to: NSPoint(x: box.maxX - arm, y: box.minY))
     cropMarks.line(to: NSPoint(x: box.maxX, y: box.minY))
     cropMarks.line(to: NSPoint(x: box.maxX, y: box.minY + arm))
+    // Top right.
+    cropMarks.move(to: NSPoint(x: box.maxX, y: box.maxY - arm))
+    cropMarks.line(to: NSPoint(x: box.maxX, y: box.maxY))
+    cropMarks.line(to: NSPoint(x: box.maxX - arm, y: box.maxY))
+    // Top left.
+    cropMarks.move(to: NSPoint(x: box.minX + arm, y: box.maxY))
+    cropMarks.line(to: NSPoint(x: box.minX, y: box.maxY))
+    cropMarks.line(to: NSPoint(x: box.minX, y: box.maxY - arm))
     cropMarks.stroke()
 
     let letter = NSBezierPath()
     letter.lineWidth = 62 * u
     letter.lineCapStyle = .round
     letter.lineJoinStyle = .round
-    let fork = NSPoint(x: box.midX, y: 500 * u)
-    letter.move(to: NSPoint(x: box.minX, y: box.maxY))
+    let letterHeight = 300 * u
+    let letterWidth = 250 * u
+    let fork = NSPoint(x: box.midX, y: box.midY - letterHeight * 0.06)
+    letter.move(to: NSPoint(x: box.midX - letterWidth / 2, y: box.midY + letterHeight / 2))
     letter.line(to: fork)
-    letter.move(to: NSPoint(x: box.maxX, y: box.maxY))
+    letter.move(to: NSPoint(x: box.midX + letterWidth / 2, y: box.midY + letterHeight / 2))
     letter.line(to: fork)
     letter.move(to: fork)
-    letter.line(to: NSPoint(x: box.midX, y: box.minY))
+    letter.line(to: NSPoint(x: box.midX, y: box.midY - letterHeight / 2))
     letter.stroke()
 
     return rep
