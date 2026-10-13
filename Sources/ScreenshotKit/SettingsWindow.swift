@@ -91,6 +91,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         // The window follows the height of the form: a red line adds a row.
         host.sizingOptions = [.preferredContentSize]
         window.contentViewController = host
+        // The window has the size of the form before the first show. Then it opens in the middle
+        // of the screen at its real size, and does not grow after it opens.
+        window.setContentSize(host.view.fittingSize)
         window.center()
 
         // A monitor sees a key before the window does. Thus the field also gets a combination with Command,
@@ -112,9 +115,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     /// Shows the window in front of other apps. A second call shows the same window.
     func show() {
         model.refreshOpenAtLogin()
-        // An accessory app is not active by default. Without this, the window opens behind other apps.
+        // The app lives in the menu bar, so a different app is the active app. macOS can refuse
+        // `NSApp.activate()` then, and the window opens behind that app. `orderFrontRegardless`
+        // puts the window in front also when the app is not active.
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 
     /// Returns `true` when the key is used.
