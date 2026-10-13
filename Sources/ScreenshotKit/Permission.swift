@@ -66,10 +66,12 @@ final class PermissionWindowController: NSWindowController {
 
     func show() {
         status.stringValue = ""
-        // An accessory app is not active by default. Without this, the window opens behind other apps.
+        // macOS can refuse `NSApp.activate()` when a different app is active. `orderFrontRegardless`
+        // puts the window in front also then (the same rule as the settings window).
         NSApp.activate()
         window?.center()
         window?.makeKeyAndOrderFront(nil)
+        window?.orderFrontRegardless()
     }
 
     @objc private func openSettings() {
