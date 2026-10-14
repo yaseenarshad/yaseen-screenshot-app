@@ -20,6 +20,12 @@ A MacBook with a notch hides the icons that do not fit. A full menu bar can put 
 - To move an icon, hold Command and drag it. Put the icons that you use most at the right, near the clock.
 - The hotkey works also when the icon does not show.
 
+### If macOS asks for the permission again after an update
+
+The download from GitHub has a simple signature. Thus macOS sees an update as a new app, and asks for the Screen Recording permission again. Turn it on again.
+
+If you build the app yourself with a fixed certificate, macOS asks one time only. The [developer page](DEVELOPMENT.md) tells how.
+
 ## Use
 
 1. Press Shift-Command-D, or select "Take screenshot" in the menu. All screens freeze.

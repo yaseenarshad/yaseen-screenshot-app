@@ -1,12 +1,26 @@
 <p align="center">
-  <img src="docs/assets/icon.png" width="112" alt="The icon of Yaseen Screenshot: a white Y in four crop corners">
+  <img src="docs/assets/banner.png" width="860" alt="Yaseen Screenshot. Press one hotkey. Drag a box. Done. A tiny native screenshot app for the Mac.">
 </p>
 
-<h1 align="center">Yaseen Screenshot</h1>
+<p align="center">
+  <a href="https://github.com/yaseenarshad/yaseen-screenshot-app/releases/latest"><img src="https://img.shields.io/github/v/release/yaseenarshad/yaseen-screenshot-app?label=version" alt="The newest version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/yaseenarshad/yaseen-screenshot-app" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B%20%C2%B7%20Apple%20Silicon-blue" alt="macOS 14 or later, Apple Silicon">
+</p>
 
 <p align="center">
-  <b>Press one hotkey. Drag a box. Done.</b><br>
-  The image is on your clipboard and in your folder, on every monitor you plug in.
+  <a href="https://github.com/yaseenarshad/yaseen-screenshot-app/releases/latest"><b>Download</b></a> ·
+  <a href="#the-answer">How it works</a> ·
+  <a href="#the-doubts">Questions</a> ·
+  <a href="docs/GUIDE.md">Guide</a>
+</p>
+
+<p align="center">
+  <b>Your screenshot is on your clipboard and in your folder, on every monitor you plug in.</b>
+</p>
+
+<p align="center">
+  <img src="docs/assets/hero.gif" width="860" alt="Press Shift-Command-D, the screen freezes, drag a box, draw a rectangle and an arrow, click Done. The image is copied and saved.">
 </p>
 
 <p align="center">
@@ -14,30 +28,28 @@
   <sub>Free · Apple Silicon · macOS 14 or later · under 1 MB</sub>
 </p>
 
-<p align="center">
-  <img src="docs/assets/hero.gif" width="860" alt="Press Shift-Command-D, the screen freezes, drag a box, draw a rectangle and an arrow, click Done. The image is copied and saved.">
-</p>
-
 ## The problem
 
-I used the same screenshot app for years. Then I plugged in a second monitor, and it stopped working.
+I used the same screenshot app for years. Then I plugged in a second monitor, and it stopped working. I looked for a replacement, and each one had the same small problems:
 
-I looked for a replacement. Each one had the same small problems:
-
-- **The screen moves while you select.** The thing that you wanted is gone before you finish the box.
-- **You need a second app to draw one arrow.** Take the shot, open it, mark it, save it again.
-- **File or clipboard: pick one.** You wanted to paste it now and also find it later.
-- **Big apps for a small job.** Many desktop apps carry a full web browser inside and are 200 MB or more.
+- You start to select, and the screen changes. The thing that you wanted is gone.
+- You take the shot. Then you open a second app to draw one arrow.
+- You must choose: a file, or the clipboard. You wanted the two.
+- You plug in a second monitor, and your screenshot tool stops working.
 
 ## The answer
 
-So I built the app that I wanted. It does one job, and it is fast.
+Yaseen Screenshot freezes each screen, lets you mark the image at once, and then copies and saves it.
 
-1. **It freezes every screen at once.** Nothing moves while you select.
-2. **You mark the image right there.** No second app.
-3. **It copies and saves, each time.** No choice, no extra step.
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/assets/step-1.png" width="260" alt="The keys Shift, Command and D"><br><b>1. Press the hotkey</b><br>All screens freeze.</td>
+    <td align="center" width="33%"><img src="docs/assets/step-2.png" width="260" alt="A box around a part of the screen, with the toolbar below"><br><b>2. Drag a box</b><br>Draw on it, if you want.</td>
+    <td align="center" width="33%"><img src="docs/assets/step-3.png" width="260" alt="The finished image, copied and saved"><br><b>3. Click Done</b><br>Copied and saved.</td>
+  </tr>
+</table>
 
-## What you can do
+## What it does
 
 ### Freeze every screen at once
 
@@ -89,7 +101,7 @@ Change the hotkey. Change the save folder. Let the app open when you log in. Tha
   <img src="docs/assets/settings.png" width="560" alt="The settings: Hotkey, Save folder, Open at login">
 </p>
 
-## Small and fast
+## The proof
 
 Each number is measured, not estimated.
 
@@ -98,46 +110,48 @@ Each number is measured, not estimated.
 | The app | 880 KB |
 | The download | 333 KB |
 | From the hotkey to the frozen screen | 109 ms on average (67 to 183 ms, 20 real captures on an M1 Max) |
-| Outside code in the app | None |
 | Automatic tests | 89 |
 
-It is a native Mac app, written in Swift. It lives in the menu bar and has no Dock icon. It has no network code, so your screen stays on your Mac.
+What the app does not need:
 
-## Get it in one minute
+- No account.
+- No payment.
+- No internet. The app has no network code, so your screen stays on your Mac.
+- No outside code. It is a native Mac app, written in Swift.
 
-1. [**Download the latest `.dmg`**](https://github.com/yaseenarshad/yaseen-screenshot-app/releases/latest).
-2. Open it. Drag **Yaseen Screenshot** to **Applications**.
-3. Open the app. macOS stops it the first time. Go to **System Settings › Privacy & Security** and click **Open Anyway**. You do this one time.
-4. The app asks for the **Screen Recording** permission. Turn it on. Each screenshot app needs this.
-5. Press **Shift-Command-D**.
+## The doubts
 
-The app needs a Mac with Apple Silicon and macOS 14 or later.
+**Is it safe?**
+The app reads the screen only when you press the hotkey. It has no network code. The code is in this repo, and you can read it.
 
-## Questions
+**Does it work with two screens?**
+Yes. That is the reason for the app. Each screen freezes, at its own sharpness.
 
-**Is it free?**
-Yes. The code is open, with the [MIT license](LICENSE). You can read it, build it and change it.
+**Does it cost money?**
+No. It is free, with the [MIT license](LICENSE).
 
-**Why does macOS say "Open Anyway"?**
-Apple has not notarized the app. That needs a paid Apple developer account. The code is in this repo, and you can build the app yourself.
-
-**Why does it need the Screen Recording permission?**
-macOS asks each app that reads the screen. The app reads the screen only when you press the hotkey. It has no network code.
-
-**macOS asked for the permission again after an update. Why?**
-The download has a simple signature, and macOS sees an update as a new app. If you build the app yourself with a fixed certificate, macOS asks one time only. The [developer page](docs/DEVELOPMENT.md) tells how.
-
-**I do not see the icon in the menu bar.**
-On a MacBook with a notch, a full menu bar hides some icons. Hold Command and drag your icons to put them in a different order. The hotkey works also when the icon is hidden.
+**Why does macOS warn me at the first start?**
+Apple has not notarized the app. That needs a paid Apple developer account. You click "Open Anyway" one time.
 
 **Does it run on an Intel Mac or on Windows?**
-No. It is for Apple Silicon Macs only.
+No. It is for Macs with Apple Silicon only.
 
-**Where is the rest?**
-The [guide](docs/GUIDE.md) has each detail of the app. The [developer page](docs/DEVELOPMENT.md) tells how to build, sign and release it.
+## The download
 
-<p align="center">
-  <br>
-  <a href="https://github.com/yaseenarshad/yaseen-screenshot-app/releases/latest"><b>Download Yaseen Screenshot for Mac</b></a><br>
-  <sub>Free · under 1 MB · one hotkey</sub>
-</p>
+[**Download the newest `.dmg`**](https://github.com/yaseenarshad/yaseen-screenshot-app/releases/latest). The app needs a Mac with Apple Silicon and macOS 14 or later.
+
+1. Open the `.dmg`. Drag **Yaseen Screenshot** to **Applications**.
+2. Open the app. Go to **System Settings › Privacy & Security** and click **Open Anyway**.
+3. Turn on the **Screen Recording** permission when the app asks.
+
+The first three things to try:
+
+1. Press **Shift-Command-D** and drag a box. Press **Enter**. Then paste.
+2. Press the hotkey again and click a window. The box goes around it.
+3. Draw an arrow. Then click **Select** and move the arrow.
+
+## For developers
+
+The app is one Swift package with no outside package. The [developer page](docs/DEVELOPMENT.md) tells how to build, test, sign and release it. The [guide](docs/GUIDE.md) has each detail for users.
+
+The license is [MIT](LICENSE).
