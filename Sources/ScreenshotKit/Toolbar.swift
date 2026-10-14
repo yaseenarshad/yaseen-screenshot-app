@@ -52,7 +52,9 @@ final class Toolbar: NSView {
         let cancel = makeButton("Cancel", image: Toolbar.symbol("xmark", name: "Cancel")) {
             [interaction] in interaction.cancel()
         }
-        let done = makeButton("Done", image: Toolbar.symbol("checkmark", name: "Done")) {
+        let done = makeButton(
+            "Done", tip: Toolbar.doneTip(for: interaction.hotKey), image: Toolbar.symbol("checkmark", name: "Done")
+        ) {
             [interaction] in interaction.done()
         }
         done.contentTintColor = NSColor(srgbRed: 0.35, green: 0.85, blue: 0.45, alpha: 1)
@@ -114,8 +116,15 @@ final class Toolbar: NSView {
 
     // MARK: The buttons
 
-    private func makeButton(_ name: String, image: NSImage, onClick: @escaping () -> Void) -> ToolbarButton {
-        let button = ToolbarButton(name: name, image: image, onClick: onClick)
+    /// The tip of Done tells the two keys that do the same as a click: "Done  ↩ or ⇧⌘D".
+    static func doneTip(for hotKey: HotKeyCombo?) -> String {
+        hotKey.map { "Done  ↩ or \($0.text)" } ?? "Done  ↩"
+    }
+
+    private func makeButton(
+        _ name: String, tip: String? = nil, image: NSImage, onClick: @escaping () -> Void
+    ) -> ToolbarButton {
+        let button = ToolbarButton(name: name, tip: tip ?? name, image: image, onClick: onClick)
         button.onHover = { [weak self] button, isInside in
             self?.showTip(isInside ? button : nil)
         }
@@ -142,14 +151,17 @@ final class Toolbar: NSView {
             tip.isHidden = true
             return
         }
-        tip.stringValue = button.name
+        tip.stringValue = button.tip
         let textSize = tip.intrinsicContentSize
         let size = CGSize(width: ceil(textSize.width) + 8, height: ceil(textSize.height) + 4)
         let anchor = convert(button.bounds, from: button)
         // Below the toolbar. At the bottom of the screen there is no room, so above the toolbar.
         let hasRoomBelow = superview.map { frame.minY - size.height - 6 >= $0.bounds.minY } ?? true
+        // The tip stays inside the width of the toolbar, and the toolbar is inside the screen.
+        // The tip of Done is wider than Done, and Done is at the right end.
+        let x = min(max(anchor.midX - size.width / 2, bounds.minX), bounds.maxX - size.width)
         tip.frame = CGRect(
-            x: (anchor.midX - size.width / 2).rounded(),
+            x: x.rounded(),
             y: hasRoomBelow ? bounds.maxY + 4 : -size.height - 4,
             width: size.width,
             height: size.height
@@ -213,9 +225,11 @@ final class Toolbar: NSView {
     override func rightMouseDown(with event: NSEvent) {}
 }
 
-/// One button of the toolbar: a picture, a name, and a mark when it is selected.
+/// One button of the toolbar: a picture, a name, a tip, and a mark when it is selected.
 final class ToolbarButton: NSButton {
     let name: String
+    /// The text below the toolbar while the pointer is on the button.
+    let tip: String
     private let onClick: () -> Void
     /// Called when the pointer enters (`true`) or leaves (`false`) the button.
     var onHover: ((ToolbarButton, Bool) -> Void)?
@@ -227,8 +241,9 @@ final class ToolbarButton: NSButton {
         }
     }
 
-    init(name: String, image: NSImage, onClick: @escaping () -> Void) {
+    init(name: String, tip: String, image: NSImage, onClick: @escaping () -> Void) {
         self.name = name
+        self.tip = tip
         self.onClick = onClick
         super.init(frame: .zero)
         self.image = image

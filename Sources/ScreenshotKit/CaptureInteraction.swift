@@ -1,9 +1,11 @@
 import CoreGraphics
 import Foundation
 
-/// The keys that a capture understands. The view maps key codes to these.
+/// The keys that a capture understands. The view maps key codes to these. `AppController` sends the hotkey.
 public enum CaptureKey {
     case enter
+    /// The hotkey, pressed again during the capture. It does the same as Enter.
+    case hotKey
     case escape
     /// Command-Z.
     case undo
@@ -64,6 +66,8 @@ public final class CaptureInteraction {
     public static let minimumDrag: CGFloat = 3
 
     public let displays: [FrozenDisplay]
+    /// The hotkey that finishes this capture, for the tip of Done. `nil` when macOS refused it.
+    public let hotKey: HotKeyCombo?
     public private(set) var marks = MarkList()
     /// The selected tool. With no tool, a drag changes the box.
     public private(set) var tool: Tool?
@@ -111,10 +115,12 @@ public final class CaptureInteraction {
     public init(
         displays: [FrozenDisplay],
         windows: [CGDirectDisplayID: [CGRect]] = [:],
+        hotKey: HotKeyCombo? = nil,
         styles: ToolStyleMemory = .shared
     ) {
         self.displays = displays
         self.windows = windows
+        self.hotKey = hotKey
         self.styles = styles
     }
 
@@ -399,7 +405,7 @@ public final class CaptureInteraction {
 
     public func key(_ key: CaptureKey) {
         switch key {
-        case .enter:
+        case .enter, .hotKey:
             done()
         case .escape:
             // Esc removes the text that is not complete, and then it clears the selected mark.
@@ -424,7 +430,7 @@ public final class CaptureInteraction {
         }
     }
 
-    /// Enter and the Done button. A text that is open is completed first.
+    /// Enter, the hotkey and the Done button. A text that is open is completed first.
     public func done() {
         guard !isFinished else { return }
         completeText()

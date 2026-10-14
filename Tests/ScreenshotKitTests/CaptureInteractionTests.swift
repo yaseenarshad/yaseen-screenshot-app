@@ -134,6 +134,23 @@ import Testing
         #expect(interaction.selection(on: retina)?.rect == CGRect(x: 20, y: 10, width: 60, height: 40))
     }
 
+    @Test func theHotKeyWithNoBoxDoesNothing() async throws {
+        let harness = try await Harness()
+        // A fast second press, before a box exists, does not end the capture.
+        harness.interaction.key(.hotKey)
+        #expect(harness.outcomes.isEmpty)
+    }
+
+    @Test func theHotKeyCompletesAnOpenTextAndThenEnds() async throws {
+        let harness = try await harnessWithBox()
+        let interaction = harness.interaction
+        interaction.selectTool(.text)
+        harness.click(at: CGPoint(x: 60, y: 50), on: retina)
+        interaction.textChanged("Hi")
+        interaction.key(.hotKey)
+        #expect(harness.doneResult?.marks.marks.map(\.text) == ["Hi"])
+    }
+
     @Test func aRightClickRemovesTheBoxAndThenCancels() async throws {
         let harness = try await Harness()
         let interaction = harness.interaction

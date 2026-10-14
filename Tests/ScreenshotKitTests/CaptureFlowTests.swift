@@ -75,6 +75,22 @@ import Testing
         #expect(PixelReader(tiffImage)[0, 0] == patternPixel(x: left, y: top))
     }
 
+    /// The hotkey, pressed again, copies and saves the box, as Enter does.
+    @Test func theHotKeyCopiesAndSavesTheBox() async throws {
+        let sandbox = try Sandbox()
+        let saver = ScreenshotSaver(pasteboard: sandbox.pasteboard, folder: sandbox.folder)
+
+        let outcome = try await capture(
+            on: FakeScreenCapture.retinaID, from: CGPoint(x: 20, y: 10), to: CGPoint(x: 150, y: 70), then: .hotKey
+        )
+        try saver.deliver(outcome, date: day)
+        saver.waitForPendingWrites()
+
+        let saved = try savedImage(in: sandbox)
+        #expect(saved.image.width == 260 && saved.image.height == 120)
+        #expect(sandbox.pasteboard.data(forType: .png) == saved.data)
+    }
+
     /// Reads the one PNG that a capture wrote to the folder of the sandbox.
     private func savedImage(in sandbox: Sandbox) throws -> (image: CGImage, data: Data) {
         #expect(sandbox.fileNames == ["Snip20261012_1.png"])

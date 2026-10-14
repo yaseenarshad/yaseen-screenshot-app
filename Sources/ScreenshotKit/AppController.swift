@@ -76,7 +76,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
         statusMenu = menu
 
         hotKeyCenter.onHotKey = { [weak self] in
-            MainActor.assumeIsolated { self?.startCapture() }
+            MainActor.assumeIsolated { self?.hotKeyPressed() }
         }
         // The app continues to run when macOS refuses the hotkey. The menu still starts a capture,
         // and the settings window shows the red line.
@@ -112,7 +112,17 @@ public final class AppController: NSObject, NSApplicationDelegate {
 
     // MARK: The capture
 
-    /// The hotkey and "Take screenshot" come here.
+    /// The hotkey starts a capture. During a capture, it does the same as Enter.
+    /// While the screens freeze, `session` is still `nil`: then `startCapture()` ignores the press.
+    private func hotKeyPressed() {
+        if let session = session {
+            session.hotKeyPressed()
+        } else {
+            startCapture()
+        }
+    }
+
+    /// "Take screenshot", and the hotkey when no capture is open, come here.
     public func startCapture() {
         guard !isCapturing, NSApp.modalWindow == nil else { return }
         guard ScreenRecordingPermission.isGranted else {
@@ -128,7 +138,9 @@ public final class AppController: NSObject, NSApplicationDelegate {
     private func freezeAndShow(start: DispatchTime) async {
         do {
             let displays = try await capturer.freezeAllDisplays()
-            let session = CaptureSession(displays: displays) { [weak self] outcome in
+            // A hotkey that macOS refused does not work, so the tip of Done must not show it.
+            let hotKey = settings.hotKeyProblem == nil ? settings.hotKey : nil
+            let session = CaptureSession(displays: displays, hotKey: hotKey) { [weak self] outcome in
                 self?.captureEnded(outcome)
             }
             self.session = session

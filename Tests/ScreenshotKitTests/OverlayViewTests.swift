@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 @testable import ScreenshotKit
 import Testing
 
@@ -280,6 +281,29 @@ extension Toolbar {
     }
 
     // MARK: The toolbar (YAZ-2767)
+
+    @Test func theTipOfDoneTellsTheKeysAndTheOtherTipsTellTheName() async throws {
+        func tip(_ name: String, hotKey: HotKeyCombo?) -> String? {
+            let interaction = CaptureInteraction(displays: [Stage.largeDisplay], hotKey: hotKey, styles: ToolStyleMemory())
+            return (Toolbar(interaction: interaction).button(named: name) as? ToolbarButton)?.tip
+        }
+        #expect(tip("Done", hotKey: .shiftCommandD) == "Done  ↩ or ⇧⌘D")
+        // The hotkey from the settings, also when it is not the default.
+        #expect(tip("Done", hotKey: HotKeyCombo(keyCode: UInt32(kVK_F5), modifiers: [.control, .option])) == "Done  ↩ or ⌃⌥F5")
+        // macOS refused the hotkey: the tip does not show a key that does not work.
+        #expect(tip("Done", hotKey: nil) == "Done  ↩")
+        #expect(tip("Undo", hotKey: .shiftCommandD) == "Undo")
+
+        // Done is at the right end of the toolbar. Its tip does not go past the right end.
+        let toolbar = Toolbar(interaction: CaptureInteraction(
+            displays: [Stage.largeDisplay], hotKey: .shiftCommandD, styles: ToolStyleMemory()
+        ))
+        let done = try #require(toolbar.button(named: "Done") as? ToolbarButton)
+        done.onHover?(done, true)
+        let shown = try #require(toolbar.subviews.compactMap { $0 as? NSTextField }.first { !$0.isHidden })
+        #expect(shown.stringValue == "Done  ↩ or ⇧⌘D")
+        #expect(shown.frame.maxX <= toolbar.bounds.maxX && shown.frame.minX >= toolbar.bounds.minX)
+    }
 
     @Test func theToolbarIsBelowTheBoxFollowsItAndSelectsTheTools() async throws {
         let stage = Stage(display: Stage.largeDisplay)
