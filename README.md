@@ -1,158 +1,143 @@
-# Yaseen Screenshot
+<p align="center">
+  <img src="docs/media/icon.png" width="112" alt="The icon of Yaseen Screenshot: a white Y in four crop corners">
+</p>
 
-A screenshot app for the Mac. Press a hotkey, drag a box, and the image is on the clipboard and in a folder.
+<h1 align="center">Yaseen Screenshot</h1>
 
-- It replaces the old app Snip.
-- It is a native Swift app. It lives in the menu bar and has no Dock icon.
-- It needs macOS 14 or later on an Apple Silicon Mac.
-- It works with more than one monitor. Each screen freezes, and the image has the real pixels of its screen.
-- The default hotkey is Shift-Command-D.
+<p align="center">
+  <b>Press one hotkey. Drag a box. Done.</b><br>
+  The image is on your clipboard and in your folder, on every monitor you plug in.
+</p>
 
-## Install from a release
+<p align="center">
+  <a href="https://github.com/yaseenarshad/yaseen-screenshot-app/releases/latest"><b>Download for Mac</b></a><br>
+  <sub>Free · Apple Silicon · macOS 14 or later · under 1 MB</sub>
+</p>
 
-1. Quit Snip first. Snip and this app both use Shift-Command-D.
-2. Open the [releases page](../../releases) and download `Yaseen-Screenshot-<version>-arm64.dmg`.
-3. Open the `.dmg`. Drag "Yaseen Screenshot" onto the "Applications" link.
-4. Start the app from `/Applications`. macOS stops it the first time, because the app is not notarized.
-5. Open System Settings, then Privacy & Security. Click "Open Anyway" next to "Yaseen Screenshot". You do this one time.
-6. The app asks for the Screen Recording permission. Open System Settings, Privacy & Security, Screen & System Audio Recording. Turn on "Yaseen Screenshot".
-7. If macOS asks, quit the app and open it again. Then press Shift-Command-D.
+<p align="center">
+  <img src="docs/media/hero.gif" width="860" alt="Press Shift-Command-D, the screen freezes, drag a box, draw a rectangle and an arrow, click Done. The image is copied and saved.">
+</p>
 
-### If you do not see the menu bar icon
+## The problem
 
-A MacBook with a notch hides the icons that do not fit. A full menu bar can put an icon behind the notch.
+I used the same screenshot app for years. Then I plugged in a second monitor, and it stopped working.
 
-- At its first start, the app asks macOS for a place to the right of the notch.
-- To move an icon, hold Command and drag it. Put the icons that you use most at the right, near the clock.
-- The hotkey works also when the icon does not show.
+I looked for a replacement. Each one had the same small problems:
 
-## Use
+- **The screen moves while you select.** The thing that you wanted is gone before you finish the box.
+- **You need a second app to draw one arrow.** Take the shot, open it, mark it, save it again.
+- **File or clipboard: pick one.** You wanted to paste it now and also find it later.
+- **Big apps for a small job.** Many desktop apps carry a full web browser inside and are 200 MB or more.
 
-1. Press Shift-Command-D, or select "Take screenshot" in the menu. All screens freeze.
-2. Drag a box. Or click a window: the window below the pointer is bright, and a click puts the box on it.
-3. Adjust the box. Drag inside it to move it. Drag a handle to change its size. A right-click removes it.
-4. Draw marks with the toolbar below the box, if you want.
-5. Press Enter, or click Done. A double-click in the box does the same when nothing is selected in the toolbar.
+## The answer
 
-Esc or Cancel stops the capture. Nothing is copied and nothing is saved. Esc first closes an open text, and then clears a selected mark.
+So I built the app that I wanted. It does one job, and it is fast.
 
-### The toolbar
+1. **It freezes every screen at once.** Nothing moves while you select.
+2. **You mark the image right there.** No second app.
+3. **It copies and saves, each time.** No choice, no extra step.
 
-- **Select:** click a mark to select it. Drag it to move it. Drag a handle to change a rectangle, an ellipse or an arrow. Delete removes it. A double-click on a text opens the text again.
-- **Rectangle, Ellipse, Arrow, Pen, Highlight, Text:** drag in the box to draw. For Text, click, type, and press Return.
-- **Sizes and colours:** Thin, Medium and Thick, and six colours. They show when a tool or a mark is selected, and they change the selected mark. Each tool starts with Thick and red. Highlight starts with amber.
-- **Undo:** the button or Command-Z. Shift-Command-Z puts the change back.
+## What you can do
 
-While marks exist, the box does not move, and a right-click does nothing.
+### Freeze every screen at once
 
-### Where the image goes
+Press the hotkey, and all your screens stop. A laptop screen and a wide monitor freeze together, each one at its own sharpness.
 
-- On the clipboard, each time.
-- In the save folder, each time. The default folder is `~/Pictures`.
-- The file name is `Snip<date>_<number>.png`, for example `Snip20261012_16.png`. The number is 1 more than the highest number of that day. The app never writes over a file.
+**So what:** you select what you saw, not what the screen became a second later. And a second monitor is not a problem. That is the reason this app exists.
 
-### The menu and the settings
+<p align="center">
+  <img src="docs/media/two-monitors.png" width="860" alt="Two monitors, frozen and dim at the same moment, with a bright box on one of them">
+</p>
 
-The menu has four rows: "Take screenshot", "Open screenshots folder", "Settings…" and "Quit".
+### Mark it up, then fix it
 
-"Settings…" has three rows:
+Draw a rectangle, an ellipse, an arrow, a free line, a highlight or a note. Three sizes and six colours. Then click **Select** to move a mark, change its size, change its colour, or delete it.
 
-- **Hotkey:** click the field and press the new keys. It needs Command, Control or Option. The default is Shift-Command-D.
-- **Save folder:** the default is `~/Pictures`.
-- **Open at login:** the default is on. It works only in the installed app.
+**So what:** a mark in the wrong place is not a reason to start again.
 
-## Build
+<p align="center">
+  <img src="docs/media/annotate.gif" width="860" alt="Draw a rectangle, an arrow, a highlight and a note. Then select the rectangle and move it.">
+</p>
 
-You need Xcode. The package has no outside dependency.
+### Grab a full window with one click
 
-- `swift build`: build the app for development.
-- `swift test`: run the unit tests. They open no window and need no permission.
-- `scripts/bundle.sh`: make `build/Yaseen Screenshot.app` from a release build and sign it.
-- `scripts/bundle.sh --dmg`: also make `build/Yaseen-Screenshot-<version>-arm64.dmg`.
-- `scripts/install.sh`: put the app from `build/` in `/Applications` and open it. It quits the app that runs first. Run `scripts/bundle.sh` before it.
-- `swift scripts/make-icon.swift`: draw the app icon again into `Support/AppIcon.icns`. Run it only after a change to the drawing.
+Move the pointer over a window, and it becomes bright. Click, and the box is exactly that window.
 
-The version is in one place: `CFBundleShortVersionString` in `Support/Info.plist`.
+**So what:** you do not drag along the edges and miss by two pixels.
 
-The app writes one log line for each capture, with the time from the hotkey to the frozen screens. Read the lines with the full path of the tool (in some shells, `log` is a different command):
+<p align="center">
+  <img src="docs/media/click-a-window.gif" width="860" alt="The window below the pointer becomes bright. One click puts the box on that window.">
+</p>
 
-```bash
-/usr/bin/log show --last 5m --predicate 'subsystem == "com.yaseenarshad.yaseenscreenshot"'
-```
+### Paste it now, find it later
 
-## The signature
+Click **Done**, press **Enter**, or double-click in the box. The image goes to your clipboard and into your Pictures folder, each time, as a sharp PNG.
 
-macOS ties the Screen Recording permission to the signature of the app. With a fixed certificate, the permission stays after an update. With an ad-hoc signature, each new build needs the permission again.
+**So what:** you paste it into your message immediately, and the file is still there next week.
 
-`scripts/bundle.sh` signs with the certificate "Yaseen Local Signing". Set `SIGN_IDENTITY` to use a different name. If the keychain does not have the certificate, the script signs ad-hoc and prints this:
+<p align="center">
+  <img src="docs/media/result.png" width="720" alt="A finished screenshot with marks, as the app saves it">
+</p>
 
-```
-WARNING: ad-hoc signature. macOS will not keep the Screen Recording permission after the next build.
-```
+### Make it yours
 
-### Make the certificate (one time)
+Change the hotkey. Change the save folder. Let the app open when you log in. That is the full list of settings.
 
-Run this command on the Mac that builds the app:
+**So what:** it fits your keys and your folders, and there is nothing else to learn.
 
-```bash
-scripts/make-signing-cert.sh
-```
+<p align="center">
+  <img src="docs/media/settings.png" width="560" alt="The settings: Hotkey, Save folder, Open at login">
+</p>
 
-It makes a self-signed certificate "Yaseen Local Signing" in your login keychain. The certificate is free and is valid for 10 years. If the keychain has the certificate already, the script does nothing.
+## Small and fast
 
-The other way is Keychain Access: in the menu, select Keychain Access, Certificate Assistant, Create a Certificate. Name: `Yaseen Local Signing`. Identity Type: Self-Signed Root. Certificate Type: Code Signing. Click Create.
+Each number is measured, not estimated.
 
-Then check the result:
+| What | Number |
+| -- | -- |
+| The app | 880 KB |
+| The download | 333 KB |
+| From the hotkey to the frozen screen | 109 ms on average (67 to 183 ms, 20 real captures on an M1 Max) |
+| Outside code in the app | None |
+| Automatic tests | 89 |
 
-1. Check that the keychain has the certificate:
+It is a native Mac app, written in Swift. It lives in the menu bar and has no Dock icon. It has no network code, so your screen stays on your Mac.
 
-   ```bash
-   security find-identity -p codesigning
-   ```
+## Get it in one minute
 
-   The list must show `"Yaseen Local Signing"`. The text `CSSMERR_TP_NOT_TRUSTED` next to it is normal for a self-signed certificate.
-2. Run `scripts/bundle.sh`. If macOS asks if `codesign` can use the key, enter your login password and click "Always Allow".
-3. Check the signature:
+1. [**Download the latest `.dmg`**](https://github.com/yaseenarshad/yaseen-screenshot-app/releases/latest).
+2. Open it. Drag **Yaseen Screenshot** to **Applications**.
+3. Open the app. macOS stops it the first time. Go to **System Settings › Privacy & Security** and click **Open Anyway**. You do this one time.
+4. The app asks for the **Screen Recording** permission. Turn it on. Each screenshot app needs this.
+5. Press **Shift-Command-D**.
 
-   ```bash
-   codesign -d -r- "build/Yaseen Screenshot.app"
-   ```
+The app needs a Mac with Apple Silicon and macOS 14 or later.
 
-   The output must name a certificate (`certificate leaf = H"…"`). It must not show `cdhash`.
+## Questions
 
-Keep this certificate. A new certificate is a new signature, and macOS asks for the permission again.
+**Is it free?**
+Yes. The code is open, with the [MIT license](LICENSE). You can read it, build it and change it.
 
-### Give the certificate to GitHub (one time)
+**Why does macOS say "Open Anyway"?**
+Apple has not notarized the app. That needs a paid Apple developer account. The code is in this repo, and you can build the app yourself.
 
-The release workflow signs with the same certificate. It reads two repository secrets.
+**Why does it need the Screen Recording permission?**
+macOS asks each app that reads the screen. The app reads the screen only when you press the hotkey. It has no network code.
 
-1. Select a password for the `.p12` file. Then export the certificate and its private key:
+**macOS asked for the permission again after an update. Why?**
+The download has a simple signature, and macOS sees an update as a new app. If you build the app yourself with a fixed certificate, macOS asks one time only. The [developer page](docs/DEVELOPMENT.md) tells how.
 
-   ```bash
-   security export -k ~/Library/Keychains/login.keychain-db -t identities -f pkcs12 -P 'YOUR-P12-PASSWORD' -o ~/yaseen-local-signing.p12
-   ```
+**I do not see the icon in the menu bar.**
+On a MacBook with a notch, a full menu bar hides some icons. Hold Command and drag your icons to put them in a different order. The hotkey works also when the icon is hidden.
 
-   This command exports all the identities in the login keychain. If the keychain has other identities, use Keychain Access instead: select "Yaseen Local Signing" in "My Certificates", then File, Export Items, format "Personal Information Exchange (.p12)".
-2. Add the two secrets with the GitHub CLI. Run these commands in the repository folder:
+**Does it run on an Intel Mac or on Windows?**
+No. It is for Apple Silicon Macs only.
 
-   ```bash
-   base64 -i ~/yaseen-local-signing.p12 | gh secret set SIGN_CERT_P12_BASE64
-   gh secret set SIGN_CERT_PASSWORD
-   ```
+**Where is the rest?**
+The [guide](docs/GUIDE.md) has each detail of the app. The [developer page](docs/DEVELOPMENT.md) tells how to build, sign and release it.
 
-   The second command asks for the value. Paste the password of the `.p12` file.
-3. Delete the file:
-
-   ```bash
-   rm ~/yaseen-local-signing.p12
-   ```
-
-Without the two secrets, the release workflow signs ad-hoc and writes a warning in its log.
-
-## Releases
-
-- No release is cut automatically.
-- Set the new version in `Support/Info.plist` (`CFBundleShortVersionString`) and merge it into `main`.
-- Tag that commit `vX.Y.Z` and push the tag. `.github/workflows/release.yml` builds the `.dmg` and attaches it to the GitHub release of that tag. It makes the release if it does not exist.
-- The workflow fails if the tag is not the version in `Support/Info.plist`.
-- `.github/workflows/ci.yml` runs `swift build` and `swift test` on each pull request.
+<p align="center">
+  <br>
+  <a href="https://github.com/yaseenarshad/yaseen-screenshot-app/releases/latest"><b>Download Yaseen Screenshot for Mac</b></a><br>
+  <sub>Free · under 1 MB · one hotkey</sub>
+</p>
