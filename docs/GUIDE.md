@@ -78,9 +78,10 @@ One key selects a tool, a size or a colour. Thus you can drag the box, press R, 
 
 The menu has four rows: "Take screenshot", "Open screenshots folder", "Settings…" and "Quit".
 
-"Settings…" has four rows:
+"Settings…" has four rows and the toolbar keys:
 
 - **Hotkey:** click the field and press the new keys. It needs Command, Control or Option. The default is Shift-Command-D.
 - **Save folder:** the default is `~/Pictures`.
 - **Play the screenshot sound:** the Mac screenshot sound when a capture is done. The default is on. macOS keeps it silent when "Play user interface sound effects" is off.
 - **Open at login:** the default is on. It works only in the installed app.
+- **Toolbar keys:** click a key, then type the new key. A key is one letter, digit or punctuation mark, with no Command, Control or Option. A key that a different button has is refused. Esc stops. "Reset to the start keys" gives the keys of the table above again. A new key works in the next capture.

@@ -262,6 +262,72 @@ private final class FakeLoginItem: LoginItem {
         }
     }
 
+    // MARK: The toolbar keys (D5, YAZ-2872)
+
+    private func key(_ code: Int, flags: NSEvent.ModifierFlags = []) -> HotKeyCombo {
+        HotKeyCombo(keyCode: UInt32(code), modifiers: flags)
+    }
+
+    /// S23 to S27 of the working log YAZ-2873.
+    @Test func theRecorderOfAToolbarKeyStoresAGoodKeyAndRefusesTheOthers() {
+        withTemporaryDefaults { defaults in
+            let hotKeys = FakeHotKeys()
+            let model = SettingsModel(store: SettingsStore(defaults: defaults), hotKeys: hotKeys, loginItem: FakeLoginItem())
+            model.registerHotKey()
+            let rectangle = ToolbarAction.tool(.rectangle)
+            #expect(model.toolbarKey(rectangle) == "r")
+            // With no recorder, the model does not use a plain key.
+            #expect(!model.keyDown(key(kVK_ANSI_Q), characters: "q"))
+
+            // S23: a good key is stored, and the capture reads it from the store.
+            model.startRecordingToolbarKey(rectangle)
+            #expect(model.recordingToolbarKey == rectangle)
+            // The global hotkey stays on during the recording.
+            #expect(hotKeys.registered == .shiftCommandD)
+            #expect(model.keyDown(key(kVK_ANSI_Q, flags: .shift), characters: "Q"))
+            #expect(model.recordingToolbarKey == nil && model.toolbarKeyProblem == nil)
+            #expect(model.toolbarKey(rectangle) == "q")
+            #expect(SettingsStore(defaults: defaults).toolbarKeys.action(for: "q") == rectangle)
+
+            // S24: a key that a different action has. The old key stays.
+            model.startRecordingToolbarKey(.tool(.ellipse))
+            #expect(model.keyDown(key(kVK_ANSI_Q), characters: "q"))
+            #expect(model.toolbarKeyProblem == "The key Q belongs to Rectangle.")
+            #expect(model.toolbarKey(.tool(.ellipse)) == "o")
+
+            // S25: a key with Command, and Space. The old key stays.
+            model.startRecordingToolbarKey(.tool(.ellipse))
+            #expect(model.toolbarKeyProblem == nil)
+            #expect(model.keyDown(key(kVK_ANSI_E, flags: .command), characters: "e"))
+            #expect(model.toolbarKeyProblem == SettingsModel.toolbarKeyNotValidText)
+            model.startRecordingToolbarKey(.tool(.ellipse))
+            #expect(model.keyDown(key(kVK_Space), characters: " "))
+            #expect(model.toolbarKeyProblem == SettingsModel.toolbarKeyNotValidText)
+            #expect(model.toolbarKey(.tool(.ellipse)) == "o")
+
+            // S26: Esc stops the recorder with no change.
+            model.startRecordingToolbarKey(.tool(.ellipse))
+            #expect(model.keyDown(escape, characters: "\u{1b}"))
+            #expect(model.recordingToolbarKey == nil && model.toolbarKey(.tool(.ellipse)) == "o")
+
+            // One recorder at a time: the hotkey field stops the key recorder, and the reverse.
+            model.startRecordingToolbarKey(.tool(.ellipse))
+            model.startRecording()
+            #expect(model.isRecording && model.recordingToolbarKey == nil)
+            model.startRecordingToolbarKey(.tool(.ellipse))
+            #expect(!model.isRecording && model.recordingToolbarKey == .tool(.ellipse))
+            // The hotkey recorder paused the hotkey. The stop puts it back.
+            #expect(hotKeys.registered == .shiftCommandD)
+
+            // S27: the reset gives the start keys and removes the red line.
+            #expect(model.keyDown(key(kVK_ANSI_Q), characters: "q"))
+            #expect(model.toolbarKeyProblem != nil)
+            model.resetToolbarKeys()
+            #expect(model.toolbarKey(rectangle) == "r" && model.toolbarKeyProblem == nil)
+            #expect(SettingsStore(defaults: defaults).toolbarKeys.action(for: "r") == rectangle)
+        }
+    }
+
     /// The form lays out with no window. The lines for a problem make it higher.
     @Test func theFormHasASizeAndGrowsWithTheProblemLines() {
         withTemporaryDefaults { defaults in
@@ -273,7 +339,8 @@ private final class FakeLoginItem: LoginItem {
             }
             let plain = size()
             #expect(plain.width == 460)
-            #expect(plain.height > 100 && plain.height < 400)
+            // The toolbar keys make the form higher. It still fits a small screen with no scroll.
+            #expect(plain.height > 300 && plain.height < 640)
 
             hotKeys.refused = [.shiftCommandD]
             model.registerHotKey()

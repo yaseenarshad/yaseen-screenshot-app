@@ -1,6 +1,6 @@
 import AppKit
 
-/// The four settings of the app (D10, YAZ-2866), in `UserDefaults`.
+/// The four settings of the app (D10, YAZ-2866), in `UserDefaults`. The toolbar keys are in `ToolbarKeys`.
 ///
 /// The `UserDefaults` is a parameter, so a test gives one that keeps its values in memory.
 /// A value that is missing or broken gives the default. The store never fails.
