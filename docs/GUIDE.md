@@ -56,8 +56,9 @@ While marks exist, the box does not move, and a right-click does nothing.
 
 The menu has four rows: "Take screenshot", "Open screenshots folder", "Settings…" and "Quit".
 
-"Settings…" has three rows:
+"Settings…" has four rows:
 
 - **Hotkey:** click the field and press the new keys. It needs Command, Control or Option. The default is Shift-Command-D.
 - **Save folder:** the default is `~/Pictures`.
+- **Play the screenshot sound:** the Mac screenshot sound when a capture is done. The default is on. macOS keeps it silent when "Play user interface sound effects" is off.
 - **Open at login:** the default is on. It works only in the installed app.
