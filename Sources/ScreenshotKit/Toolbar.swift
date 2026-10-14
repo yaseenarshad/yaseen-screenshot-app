@@ -4,6 +4,9 @@ import AppKit
 /// the three sizes and the six colours shows while a tool is selected, and with Select while a
 /// mark is selected.
 ///
+/// Each button with a key shows its key in a small letter, only while the pointer is on the
+/// toolbar (D3, YAZ-2872). The tip of each button names its key too.
+///
 /// A thin adapter: a click calls `CaptureInteraction`, and `refresh()` shows the state that it reads there.
 final class Toolbar: NSView {
     private static let buttonSide: CGFloat = 28
@@ -26,6 +29,8 @@ final class Toolbar: NSView {
 
     init(interaction: CaptureInteraction) {
         self.interaction = interaction
+        // The keys can change only in the settings window, so one read serves the full capture.
+        let keys = interaction.toolbarKeys.all
         super.init(frame: .zero)
         wantsLayer = true
         layer?.backgroundColor = CGColor(gray: 0.13, alpha: 0.96)
@@ -34,22 +39,22 @@ final class Toolbar: NSView {
         layer?.borderWidth = 0.5
 
         // "Select" is the first button (D15 on YAZ-2782). It is not a `Tool`: it draws no mark.
-        let select = makeButton("Select", image: Toolbar.symbol("cursorarrow", name: "Select")) {
+        let select = makeButton("Select", key: keys[.select], image: Toolbar.symbol("cursorarrow", name: "Select")) {
             [interaction] in interaction.toggleSelecting()
         }
         selectButton = select
         let tools = Tool.allCases.map { tool -> ToolbarButton in
-            let button = makeButton(tool.name, image: Toolbar.symbol(Toolbar.symbolName(for: tool), name: tool.name)) {
+            let button = makeButton(tool.name, key: keys[.tool(tool)], image: Toolbar.symbol(Toolbar.symbolName(for: tool), name: tool.name)) {
                 [interaction] in interaction.selectTool(tool)
             }
             toolButtons[tool] = button
             return button
         }
-        let undo = makeButton("Undo", image: Toolbar.symbol("arrow.uturn.backward", name: "Undo")) {
+        let undo = makeButton("Undo", tip: "Undo  ⌘Z", image: Toolbar.symbol("arrow.uturn.backward", name: "Undo")) {
             [interaction] in interaction.undo()
         }
         undoButton = undo
-        let cancel = makeButton("Cancel", image: Toolbar.symbol("xmark", name: "Cancel")) {
+        let cancel = makeButton("Cancel", tip: "Cancel  Esc", image: Toolbar.symbol("xmark", name: "Cancel")) {
             [interaction] in interaction.cancel()
         }
         let done = makeButton(
@@ -61,12 +66,12 @@ final class Toolbar: NSView {
         width = layOut([[select] + tools, [undo], [cancel, done]], in: self)
 
         let sizes = MarkSize.allCases.map { size -> ToolbarButton in
-            let button = makeButton(size.name, image: Toolbar.dot(for: size)) { [interaction] in interaction.setSize(size) }
+            let button = makeButton(size.name, key: keys[.size(size)], image: Toolbar.dot(for: size)) { [interaction] in interaction.setSize(size) }
             sizeButtons[size] = button
             return button
         }
         let colors = MarkColor.allCases.map { color -> ToolbarButton in
-            let button = makeButton(color.name, image: Toolbar.swatch(for: color)) { [interaction] in interaction.setColor(color) }
+            let button = makeButton(color.name, key: keys[.color(color)], image: Toolbar.swatch(for: color)) { [interaction] in interaction.setColor(color) }
             colorButtons[color] = button
             return button
         }
@@ -84,6 +89,13 @@ final class Toolbar: NSView {
         tip.layer?.cornerRadius = 4
         tip.isHidden = true
         addSubview(tip)
+
+        // The pointer on the toolbar shows the keys, and the pointer off it hides them.
+        addTrackingArea(NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self
+        ))
 
         refresh()
     }
@@ -111,7 +123,11 @@ final class Toolbar: NSView {
             tip.isHidden = true
         }
         let size = CGSize(width: width, height: style == nil ? Toolbar.rowHeight : Toolbar.tallestHeight)
-        if frame.size != size { setFrameSize(size) }
+        if frame.size != size {
+            setFrameSize(size)
+            // The toolbar can grow below the pointer, or shrink away from it, with no pointer event.
+            showKeysForPointer()
+        }
     }
 
     // MARK: The buttons
@@ -121,10 +137,13 @@ final class Toolbar: NSView {
         hotKey.map { "Done  ↩ or \($0.text)" } ?? "Done  ↩"
     }
 
+    /// The tip names the key of the button: "Rectangle  R".
     private func makeButton(
-        _ name: String, tip: String? = nil, image: NSImage, onClick: @escaping () -> Void
+        _ name: String, key: String? = nil, tip: String? = nil, image: NSImage, onClick: @escaping () -> Void
     ) -> ToolbarButton {
-        let button = ToolbarButton(name: name, tip: tip ?? name, image: image, onClick: onClick)
+        let key = key?.uppercased()
+        let text = tip ?? [name, key].compactMap { $0 }.joined(separator: "  ")
+        let button = ToolbarButton(name: name, key: key, tip: text, image: image, onClick: onClick)
         button.onHover = { [weak self] button, isInside in
             self?.showTip(isInside ? button : nil)
         }
@@ -223,11 +242,43 @@ final class Toolbar: NSView {
     override func mouseDragged(with event: NSEvent) {}
     override func mouseUp(with event: NSEvent) {}
     override func rightMouseDown(with event: NSEvent) {}
+
+    override func mouseEntered(with event: NSEvent) {
+        showKeys(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        showKeys(false)
+    }
+
+    // The toolbar can show below the pointer, or hide, with no pointer event.
+    override func viewDidUnhide() {
+        super.viewDidUnhide()
+        showKeysForPointer()
+    }
+
+    override func viewDidHide() {
+        super.viewDidHide()
+        showKeys(false)
+    }
+
+    private func showKeysForPointer() {
+        guard let window = window else { return }
+        showKeys(!isHidden && bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)))
+    }
+
+    private func showKeys(_ isShown: Bool) {
+        for case let button as ToolbarButton in subviews + optionsRow.subviews {
+            button.showsKey = isShown
+        }
+    }
 }
 
 /// One button of the toolbar: a picture, a name, a tip, and a mark when it is selected.
 final class ToolbarButton: NSButton {
     let name: String
+    /// The key of the button, in upper case. `nil` for a button with a fixed key.
+    let key: String?
     /// The text below the toolbar while the pointer is on the button.
     let tip: String
     private let onClick: () -> Void
@@ -238,11 +289,21 @@ final class ToolbarButton: NSButton {
         didSet {
             guard isOn != oldValue else { return }
             layer?.backgroundColor = isOn ? CGColor(gray: 1, alpha: 0.28) : nil
+            if showsKey { needsDisplay = true }
         }
     }
 
-    init(name: String, tip: String, image: NSImage, onClick: @escaping () -> Void) {
+    /// True while the pointer is on the toolbar. Then the button shows its key.
+    var showsKey = false {
+        didSet {
+            guard showsKey != oldValue, key != nil else { return }
+            needsDisplay = true
+        }
+    }
+
+    init(name: String, key: String? = nil, tip: String, image: NSImage, onClick: @escaping () -> Void) {
         self.name = name
+        self.key = key
         self.tip = tip
         self.onClick = onClick
         super.init(frame: .zero)
@@ -284,5 +345,25 @@ final class ToolbarButton: NSButton {
 
     override func mouseExited(with event: NSEvent) {
         onHover?(self, false)
+    }
+
+    // MARK: The key
+
+    /// The key is small and faint, as in the Draw app. It must not compete with the picture of the
+    /// button. It is a little lighter on a selected button. The tip shows the key clearly.
+    var keyText: NSAttributedString? {
+        guard showsKey, let key = key else { return nil }
+        return NSAttributedString(string: key, attributes: [
+            .font: NSFont.systemFont(ofSize: 8, weight: .regular),
+            .foregroundColor: NSColor(white: 1, alpha: isOn ? 0.5 : 0.3),
+        ])
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard let text = keyText else { return }
+        // The bottom-right corner. The button counts from its top.
+        let size = text.size()
+        text.draw(at: CGPoint(x: bounds.maxX - size.width - 2.5, y: bounds.maxY - size.height - 0.5))
     }
 }

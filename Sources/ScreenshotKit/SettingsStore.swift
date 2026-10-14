@@ -1,6 +1,6 @@
 import AppKit
 
-/// The four settings of the app (D10, YAZ-2866), in `UserDefaults`.
+/// The four settings of the app (D10, YAZ-2866), in `UserDefaults`. The toolbar keys are in `ToolbarKeys`.
 ///
 /// The `UserDefaults` is a parameter, so a test gives one that keeps its values in memory.
 /// A value that is missing or broken gives the default. The store never fails.
@@ -70,6 +70,9 @@ public final class SettingsStore {
         get { defaults.object(forKey: Key.playSound) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Key.playSound) }
     }
+
+    /// The keys of the toolbar (D1, YAZ-2872), in their own store on the same `UserDefaults`.
+    var toolbarKeys: ToolbarKeys { ToolbarKeys(defaults: defaults) }
 
     /// True after the first start tried to register the app as a login item. The app tries one time only.
     public var loginItemWasTried: Bool {

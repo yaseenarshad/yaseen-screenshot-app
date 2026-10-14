@@ -15,9 +15,17 @@ import Testing
         var outcomes: [CaptureOutcome] = []
 
         /// Each harness has its own style memory, so one test does not change the styles of the next.
-        init(windows: [CGDirectDisplayID: [CGRect]] = [:], styles: ToolStyleMemory = ToolStyleMemory()) async throws {
+        /// The toolbar keys are in memory, so a test never reads the keys of the user.
+        init(
+            windows: [CGDirectDisplayID: [CGRect]] = [:],
+            styles: ToolStyleMemory = ToolStyleMemory(),
+            toolbarKeys: ToolbarKeys = ToolbarKeys(defaults: MemoryDefaults())
+        ) async throws {
             interaction = CaptureInteraction(
-                displays: try await FakeScreenCapture().freezeAllDisplays(), windows: windows, styles: styles
+                displays: try await FakeScreenCapture().freezeAllDisplays(),
+                windows: windows,
+                toolbarKeys: toolbarKeys,
+                styles: styles
             )
             interaction.onChange = { [unowned self] in self.changes += 1 }
             interaction.onFinish = { [unowned self] in self.outcomes.append($0) }
@@ -474,6 +482,90 @@ import Testing
         #expect(harness.outcomes.isEmpty)
         harness.interaction.key(.escape)
         #expect(harness.isCancelled)
+    }
+
+    // MARK: The toolbar keys (YAZ-2872)
+
+    /// The scenarios S1 to S17 of the working log YAZ-2873.
+    @Test func aToolbarKeyDoesWhatItsButtonDoesButNeverClearsATool() async throws {
+        let harness = try await Harness()
+        let interaction = harness.interaction
+
+        // S1: no box, no tool.
+        interaction.toolbarKey("r")
+        #expect(interaction.tool == nil && harness.changes == 0)
+
+        harness.drag(from: CGPoint(x: 40, y: 20), to: CGPoint(x: 140, y: 80), on: retina)
+        // S2 and S3: R selects the Rectangle, and a second R keeps it.
+        interaction.toolbarKey("r")
+        interaction.toolbarKey("r")
+        #expect(interaction.tool == .rectangle)
+        // S9: a size key and a colour key change the style of the selected tool.
+        interaction.toolbarKey("2")
+        interaction.toolbarKey("7")
+        #expect(interaction.style == MarkStyle(color: .blue, size: .medium))
+        // S5 and S17: a different tool key, and P for the Pen.
+        interaction.toolbarKey("o")
+        #expect(interaction.tool == .ellipse)
+        interaction.toolbarKey("p")
+        #expect(interaction.tool == .pen)
+        // S18: a key that is not a toolbar key.
+        interaction.toolbarKey("q")
+        #expect(interaction.tool == .pen)
+
+        // S13: a key during a drag does nothing. The mark keeps its tool.
+        interaction.toolbarKey("r")
+        interaction.pointerDown(at: CGPoint(x: 60, y: 30), on: retina)
+        interaction.pointerDragged(to: CGPoint(x: 90, y: 50))
+        interaction.toolbarKey("o")
+        interaction.toolbarKey("4")
+        interaction.pointerUp(at: CGPoint(x: 100, y: 60))
+        #expect(interaction.tool == .rectangle)
+        #expect(interaction.marks.marks.map(\.tool) == [.rectangle])
+        #expect(interaction.marks.marks[0].style == MarkStyle(color: .blue, size: .medium))
+
+        // S6 and S7: V selects Select, and a second V keeps it.
+        interaction.toolbarKey("v")
+        interaction.toolbarKey("v")
+        #expect(interaction.isSelecting && interaction.tool == nil)
+        // S10: with a selected mark, a colour key changes that mark.
+        harness.click(at: CGPoint(x: 80, y: 30), on: retina)
+        #expect(interaction.selectedIndex == 0)
+        interaction.toolbarKey("6")
+        #expect(interaction.marks.marks[0].style.color == .green)
+        // S8: a tool key releases the mark, as a click on the tool does.
+        interaction.toolbarKey("t")
+        #expect(interaction.tool == .text && interaction.selectedIndex == nil)
+
+        // S11: while a text is open, the keys are for the typing.
+        harness.click(at: CGPoint(x: 100, y: 70), on: retina)
+        #expect(interaction.textEdit != nil)
+        interaction.toolbarKey("r")
+        interaction.toolbarKey("4")
+        #expect(interaction.tool == .text && interaction.textEdit?.style.color == .red)
+        interaction.completeText()
+
+        // S12: with no tool, no mark and no text, a size or colour key does nothing.
+        interaction.selectTool(.text)
+        #expect(interaction.tool == nil && interaction.style == nil)
+        let changes = harness.changes
+        interaction.toolbarKey("2")
+        interaction.toolbarKey("5")
+        #expect(harness.changes == changes)
+        #expect(harness.outcomes.isEmpty)
+    }
+
+    /// S23: the keys come from the store. A key that the user changed works, and the old key does not.
+    @Test func theToolbarKeysComeFromTheStore() async throws {
+        let defaults = MemoryDefaults()
+        defaults.set(["tool.rectangle": "q"], forKey: "toolbarKeys")
+        let harness = try await Harness(toolbarKeys: ToolbarKeys(defaults: defaults))
+        let interaction = harness.interaction
+        harness.drag(from: CGPoint(x: 40, y: 20), to: CGPoint(x: 140, y: 80), on: retina)
+        interaction.toolbarKey("r")
+        #expect(interaction.tool == nil)
+        interaction.toolbarKey("q")
+        #expect(interaction.tool == .rectangle)
     }
 
     // MARK: Select a mark (YAZ-2782)
