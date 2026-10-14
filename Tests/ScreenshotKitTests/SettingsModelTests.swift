@@ -43,6 +43,24 @@ private final class FakeLoginItem: LoginItem {
     private let controlOptionS = HotKeyCombo(keyCode: UInt32(kVK_ANSI_S), modifiers: [.control, .option])
     private let escape = HotKeyCombo(keyCode: UInt32(kVK_Escape), modifiers: [])
 
+    // YAZ-2866: the switch stores the value, and the app hears each change (it plays the sound on "on").
+    @Test func theSoundSwitchStoresTheValueAndTellsTheApp() {
+        withTemporaryDefaults { defaults in
+            let model = SettingsModel(store: SettingsStore(defaults: defaults), hotKeys: FakeHotKeys(), loginItem: FakeLoginItem())
+            var told: [Bool] = []
+            model.onPlaySoundChanged = { told.append($0) }
+            #expect(model.playSound == true)
+
+            model.setPlaySound(false)
+            #expect(model.playSound == false)
+            #expect(SettingsStore(defaults: defaults).playSound == false)
+
+            model.setPlaySound(true)
+            #expect(told == [false, true])
+            #expect(SettingsStore(defaults: defaults).playSound == true)
+        }
+    }
+
     // Rows 5 to 9 and 11.
     @Test func theFieldRecordsAValidCombinationAndSavesIt() {
         withTemporaryDefaults { defaults in

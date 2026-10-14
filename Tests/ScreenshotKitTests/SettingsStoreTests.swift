@@ -37,6 +37,7 @@ func withTemporaryDefaults<T>(_ body: (UserDefaults) throws -> T) rethrows -> T 
             #expect(store.saveFolder.path == NSHomeDirectory() + "/Pictures")
             #expect(store.openAtLogin == true)
             #expect(store.loginItemWasTried == false)
+            #expect(store.playSound == true)
         }
     }
 
@@ -50,12 +51,14 @@ func withTemporaryDefaults<T>(_ body: (UserDefaults) throws -> T) rethrows -> T 
             first.saveFolder = folder
             first.openAtLogin = false
             first.loginItemWasTried = true
+            first.playSound = false
 
             let second = SettingsStore(defaults: defaults)
             #expect(second.hotKey == combo)
             #expect(second.saveFolder.path == folder.path)
             #expect(second.openAtLogin == false)
             #expect(second.loginItemWasTried == true)
+            #expect(second.playSound == false)
         }
     }
 
@@ -90,6 +93,8 @@ func withTemporaryDefaults<T>(_ body: (UserDefaults) throws -> T) rethrows -> T 
             #expect(store.openAtLogin == true)
             defaults.set(["x"], forKey: "loginItemWasTried")
             #expect(store.loginItemWasTried == false)
+            defaults.set("perhaps", forKey: "playSound")
+            #expect(store.playSound == true)
 
             // The numbers 1 and 0 are a switch value, as the `defaults` command writes them.
             defaults.set(NSNumber(value: 0), forKey: "openAtLogin")

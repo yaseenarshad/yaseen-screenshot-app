@@ -2,7 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import SwiftUI
 
-/// The three rows of the settings window (D10).
+/// The four rows of the settings window (D10, YAZ-2866).
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     let chooseFolder: () -> Void
@@ -32,6 +32,12 @@ struct SettingsView: View {
                     Button("Change…", action: chooseFolder)
                 }
             }
+
+            Toggle("Play the screenshot sound", isOn: Binding(
+                get: { model.playSound },
+                set: { model.setPlaySound($0) }
+            ))
+            .toggleStyle(.switch)
 
             VStack(alignment: .leading, spacing: 4) {
                 Toggle("Open at login", isOn: Binding(

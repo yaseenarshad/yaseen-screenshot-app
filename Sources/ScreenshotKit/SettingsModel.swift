@@ -3,7 +3,7 @@ import Carbon.HIToolbox
 
 /// The state and the rules of the settings window, with no window and no view.
 ///
-/// The model owns the changes of the three settings: it registers the hotkey, stores the values,
+/// The model owns the changes of the four settings: it registers the hotkey, stores the values,
 /// and asks macOS for "open at login". The app and the window only call it. Thus a test proves the rules.
 @MainActor
 final class SettingsModel: ObservableObject {
@@ -21,10 +21,14 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var openAtLogin = false
     /// The red line below the switch.
     @Published private(set) var loginItemProblem: String?
+    /// The sound at the end of a capture.
+    @Published private(set) var playSound: Bool
 
     /// The menu shows the hotkey, so the app must know each change.
     var onHotKeyChanged: (HotKeyCombo) -> Void = { _ in }
     var onSaveFolderChanged: (URL) -> Void = { _ in }
+    /// The app plays the sound one time when the switch goes on.
+    var onPlaySoundChanged: (Bool) -> Void = { _ in }
 
     private let store: SettingsStore
     private let hotKeys: HotKeyRegistering
@@ -36,6 +40,7 @@ final class SettingsModel: ObservableObject {
         self.loginItem = loginItem
         hotKey = store.hotKey
         saveFolder = store.saveFolder
+        playSound = store.playSound
         refreshOpenAtLogin()
     }
 
@@ -98,6 +103,16 @@ final class SettingsModel: ObservableObject {
         saveFolder = folder
         store.saveFolder = folder
         onSaveFolderChanged(folder)
+    }
+
+    // MARK: The sound
+
+    func setPlaySound(_ enabled: Bool) {
+        // No change, no sound: the switch must not play it two times.
+        guard enabled != playSound else { return }
+        playSound = enabled
+        store.playSound = enabled
+        onPlaySoundChanged(enabled)
     }
 
     // MARK: Open at login
