@@ -6,7 +6,6 @@
   <a href="https://github.com/yaseenarshad/yaseen-screenshot-app/releases/latest"><img src="https://img.shields.io/github/v/release/yaseenarshad/yaseen-screenshot-app?label=version" alt="The newest version"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/yaseenarshad/yaseen-screenshot-app" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/macOS-14%2B%20%C2%B7%20Apple%20Silicon-blue" alt="macOS 14 or later, Apple Silicon">
-  <a href="https://github.com/yaseenarshad/yaseen-screenshot-app/releases"><img src="https://img.shields.io/github/downloads/yaseenarshad/yaseen-screenshot-app/total" alt="Downloads"></a>
 </p>
 
 <p align="center">
@@ -30,6 +29,8 @@
 </p>
 
 ## The problem
+
+I used the same screenshot app for years. Then I plugged in a second monitor, and it stopped working. I looked for a replacement, and each one had the same small problems:
 
 - You start to select, and the screen changes. The thing that you wanted is gone.
 - You take the shot. Then you open a second app to draw one arrow.
@@ -131,6 +132,9 @@ No. It is free, with the [MIT license](LICENSE).
 
 **Why does macOS warn me at the first start?**
 Apple has not notarized the app. That needs a paid Apple developer account. You click "Open Anyway" one time.
+
+**Does it run on an Intel Mac or on Windows?**
+No. It is for Macs with Apple Silicon only.
 
 ## The download
 
