@@ -520,6 +520,11 @@ extension Toolbar {
         #expect(undo.keyText == nil)
         toolbar.mouseExited(with: try pointer(.mouseExited))
         #expect(rectangle.keyText == nil && blue.keyText == nil)
+
+        // The toolbar hides with the pointer on it (a new box, for example): the letters go too.
+        toolbar.mouseEntered(with: try pointer(.mouseEntered))
+        toolbar.isHidden = true
+        #expect(rectangle.keyText == nil)
     }
 
     // MARK: The text field and the panel (YAZ-2767 and the keyboard decision on YAZ-2765)

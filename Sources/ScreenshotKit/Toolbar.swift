@@ -123,7 +123,11 @@ final class Toolbar: NSView {
             tip.isHidden = true
         }
         let size = CGSize(width: width, height: style == nil ? Toolbar.rowHeight : Toolbar.tallestHeight)
-        if frame.size != size { setFrameSize(size) }
+        if frame.size != size {
+            setFrameSize(size)
+            // The toolbar can grow below the pointer, or shrink away from it, with no pointer event.
+            showKeysForPointer()
+        }
     }
 
     // MARK: The buttons
@@ -245,6 +249,22 @@ final class Toolbar: NSView {
 
     override func mouseExited(with event: NSEvent) {
         showKeys(false)
+    }
+
+    // The toolbar can show below the pointer, or hide, with no pointer event.
+    override func viewDidUnhide() {
+        super.viewDidUnhide()
+        showKeysForPointer()
+    }
+
+    override func viewDidHide() {
+        super.viewDidHide()
+        showKeys(false)
+    }
+
+    private func showKeysForPointer() {
+        guard let window = window else { return }
+        showKeys(!isHidden && bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)))
     }
 
     private func showKeys(_ isShown: Bool) {
