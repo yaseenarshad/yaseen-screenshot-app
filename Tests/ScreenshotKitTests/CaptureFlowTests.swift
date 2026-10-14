@@ -3,6 +3,12 @@ import ImageIO
 @testable import ScreenshotKit
 import Testing
 
+/// A sound that counts its plays and makes no noise.
+private final class CountingSound: SoundPlaying {
+    private(set) var plays = 0
+    func play() { plays += 1 }
+}
+
 /// The end-to-end flow with no window: a fake frozen screen, the pointer calls, a key,
 /// and then the same `deliver` call that the app makes.
 @Suite struct CaptureFlowTests {
@@ -89,6 +95,37 @@ import Testing
         let saved = try savedImage(in: sandbox)
         #expect(saved.image.width == 260 && saved.image.height == 120)
         #expect(sandbox.pasteboard.data(forType: .png) == saved.data)
+    }
+
+    /// YAZ-2866: Done plays the sound one time and still saves. Esc and the switch off play nothing.
+    @MainActor
+    @Test func theSoundPlaysOnlyForADoneWithTheSwitchOn() async throws {
+        let done = try await capture(
+            on: FakeScreenCapture.retinaID, from: CGPoint(x: 20, y: 10), to: CGPoint(x: 150, y: 70), then: .enter
+        )
+        let cancel = try await capture(
+            on: FakeScreenCapture.retinaID, from: CGPoint(x: 20, y: 10), to: CGPoint(x: 150, y: 70), then: .escape
+        )
+
+        let sandbox = try Sandbox()
+        let saver = ScreenshotSaver(pasteboard: sandbox.pasteboard, folder: sandbox.folder)
+        let sound = CountingSound()
+        let app = AppController(saver: saver, store: SettingsStore(defaults: MemoryDefaults()), sound: sound)
+        app.captureEnded(done)
+        #expect(sound.plays == 1)
+        app.captureEnded(cancel)
+        #expect(sound.plays == 1)
+        saver.waitForPendingWrites()
+        #expect(sandbox.fileNames.count == 1)
+        #expect(sandbox.pasteboard.data(forType: .png) != nil)
+
+        let off = SettingsStore(defaults: MemoryDefaults())
+        off.playSound = false
+        let silentSound = CountingSound()
+        let silentSaver = ScreenshotSaver(pasteboard: sandbox.pasteboard, folder: sandbox.folder)
+        AppController(saver: silentSaver, store: off, sound: silentSound).captureEnded(done)
+        silentSaver.waitForPendingWrites()
+        #expect(silentSound.plays == 0)
     }
 
     /// Reads the one PNG that a capture wrote to the folder of the sandbox.

@@ -1,6 +1,6 @@
 import AppKit
 
-/// The three settings of the app (D10), in `UserDefaults`.
+/// The four settings of the app (D10, YAZ-2866), in `UserDefaults`.
 ///
 /// The `UserDefaults` is a parameter, so a test gives one that keeps its values in memory.
 /// A value that is missing or broken gives the default. The store never fails.
@@ -10,6 +10,7 @@ public final class SettingsStore {
         static let hotKeyModifiers = "hotKeyModifiers"
         static let saveFolder = "saveFolder"
         static let openAtLogin = "openAtLogin"
+        static let playSound = "playSound"
         static let loginItemWasTried = "loginItemWasTried"
     }
 
@@ -62,6 +63,12 @@ public final class SettingsStore {
     public var openAtLogin: Bool {
         get { defaults.object(forKey: Key.openAtLogin) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Key.openAtLogin) }
+    }
+
+    /// The sound at the end of a capture. The default is on, as in the macOS screenshot.
+    public var playSound: Bool {
+        get { defaults.object(forKey: Key.playSound) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.playSound) }
     }
 
     /// True after the first start tried to register the app as a login item. The app tries one time only.

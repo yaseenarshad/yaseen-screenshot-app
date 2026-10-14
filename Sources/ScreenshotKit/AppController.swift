@@ -11,6 +11,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
 
     private let capturer: ScreenCapturing
     private let saver: ScreenshotSaver
+    private let sound: SoundPlaying
     private let hotKeyCenter = HotKeyCenter()
     private let settings: SettingsModel
     private let log = Logger(subsystem: AppController.bundleIdentifier, category: "capture")
@@ -26,10 +27,12 @@ public final class AppController: NSObject, NSApplicationDelegate {
         capturer: ScreenCapturing = SystemScreenCapture(),
         saver: ScreenshotSaver,
         store: SettingsStore,
-        loginItem: LoginItem = SystemLoginItem()
+        loginItem: LoginItem = SystemLoginItem(),
+        sound: SoundPlaying = SystemCaptureSound()
     ) {
         self.capturer = capturer
         self.saver = saver
+        self.sound = sound
         settings = SettingsModel(store: store, hotKeys: hotKeyCenter, loginItem: loginItem)
     }
 
@@ -86,6 +89,8 @@ public final class AppController: NSObject, NSApplicationDelegate {
         }
         settings.onHotKeyChanged = { [weak self] hotKey in self?.statusMenu?.showHotKey(hotKey) }
         settings.onSaveFolderChanged = { [weak self] folder in self?.saver.folder = folder }
+        // The user hears the sound when the switch goes on.
+        settings.onPlaySoundChanged = { [weak self] isOn in if isOn { self?.sound.play() } }
         settings.registerLoginItemAtFirstStart()
 
         if !ScreenRecordingPermission.isGranted {
@@ -154,10 +159,15 @@ public final class AppController: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func captureEnded(_ outcome: CaptureOutcome) {
+    /// Internal, not private: a test gives it an outcome with no window.
+    func captureEnded(_ outcome: CaptureOutcome) {
         // The session holds the frozen images. Free them now.
         session = nil
         isCapturing = false
+        // Before the copy, so the sound comes at once, as in the macOS screenshot. Cancel is silent.
+        if case .done = outcome, settings.playSound {
+            sound.play()
+        }
         do {
             try saver.deliver(outcome) { [weak self] result in
                 if case .failure(let failure) = result {
