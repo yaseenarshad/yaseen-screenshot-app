@@ -2,9 +2,9 @@ import CoreGraphics
 
 // The model of the marks that the user draws in the box. No drawing here: `MarkRenderer` draws.
 
-/// The six tools, in the order of the toolbar.
+/// The seven tools, in the order of the toolbar.
 public enum Tool: Hashable, CaseIterable {
-    case rectangle, ellipse, arrow, pen, highlight, text
+    case rectangle, ellipse, arrow, pen, highlight, text, number
 
     public var name: String {
         switch self {
@@ -14,6 +14,7 @@ public enum Tool: Hashable, CaseIterable {
         case .pen: return "Pen"
         case .highlight: return "Highlight"
         case .text: return "Text"
+        case .number: return "Number"
         }
     }
 }
@@ -93,10 +94,19 @@ public struct MarkStyle: Equatable {
         }
     }
 
+    /// The diameter of the circle of a Number mark, in points (the same as the Stamp of Screendraw).
+    public var numberDiameter: CGFloat {
+        switch size {
+        case .thin: return 22
+        case .medium: return 30
+        case .thick: return 40
+        }
+    }
+
     /// A point of a mark, kept in a box of `size`: it stops half a line width before each edge,
-    /// so the full line is visible.
+    /// so the full line is visible (for Number, half the circle).
     public func pointInBox(_ point: CGPoint, for tool: Tool, in size: CGSize) -> CGPoint {
-        let inset = lineWidth(for: tool) / 2
+        let inset = (tool == .number ? numberDiameter : lineWidth(for: tool)) / 2
         func clamp(_ value: CGFloat, _ length: CGFloat) -> CGFloat {
             // A box that is narrower than the line keeps the point in its middle.
             let low = min(inset, length / 2)
@@ -112,18 +122,24 @@ public struct Mark: Equatable {
     public var style: MarkStyle
     /// Rectangle and Ellipse: two opposite corners. Arrow: the start, and the end with the head.
     /// Pen and Highlight: the path of the pointer. Text: the top-left of the text.
+    /// Number: the middle of the circle.
     public var points: [CGPoint]
     /// Only for Text.
     public var text: String
     /// Only for Text: a line breaks at this width.
     public var wrapWidth: CGFloat
+    /// Only for Number: the number in the circle.
+    public var number: Int
 
-    public init(tool: Tool, style: MarkStyle, points: [CGPoint], text: String = "", wrapWidth: CGFloat = 0) {
+    public init(
+        tool: Tool, style: MarkStyle, points: [CGPoint], text: String = "", wrapWidth: CGFloat = 0, number: Int = 0
+    ) {
         self.tool = tool
         self.style = style
         self.points = points
         self.text = text
         self.wrapWidth = wrapWidth
+        self.number = number
     }
 }
 
@@ -180,6 +196,8 @@ extension Mark {
             guard let origin = points.first else { return .null }
             return TextLayout(text: text, style: style, wrapWidth: wrapWidth).usedRect
                 .offsetBy(dx: origin.x, dy: origin.y)
+        case .number:
+            return frame.insetBy(dx: -style.numberDiameter / 2, dy: -style.numberDiameter / 2)
         }
     }
 
@@ -239,6 +257,9 @@ extension Mark {
             return Mark.distance(from: point, toLineThrough: points) <= reach ? .line : nil
         case .text:
             return bounds.insetBy(dx: -tolerance, dy: -tolerance).contains(point) ? .line : nil
+        case .number:
+            guard let middle = points.first else { return nil }
+            return hypot(point.x - middle.x, point.y - middle.y) <= style.numberDiameter / 2 + tolerance ? .line : nil
         }
     }
 
@@ -271,7 +292,7 @@ extension Mark {
     // MARK: Handles, move and size change
 
     /// The handles of the selected mark, with their places: eight for a Rectangle and an Ellipse,
-    /// and one at each end of an Arrow. A Pen, a Highlight and a Text mark only move.
+    /// and one at each end of an Arrow. A Pen, a Highlight, a Text and a Number mark only move.
     public var handles: [(key: MarkHandle, point: CGPoint)] {
         switch tool {
         case .rectangle, .ellipse:
@@ -279,7 +300,7 @@ extension Mark {
             return Handle.allCases.map { (.frame($0), Selection.handlePoint($0, of: frame)) }
         case .arrow:
             return points.indices.map { (.end($0), points[$0]) }
-        case .pen, .highlight, .text:
+        case .pen, .highlight, .text, .number:
             return []
         }
     }
@@ -364,6 +385,12 @@ public struct MarkList: Equatable {
     public var isEmpty: Bool { marks.isEmpty }
     public var canUndo: Bool { !undoStack.isEmpty }
     public var canRedo: Bool { !redoStack.isEmpty }
+
+    /// The number of the next Number mark: the highest number in the box, plus 1. With no
+    /// Number mark, it is 1. No counter is stored, so Undo, Redo and Delete need no extra code.
+    public var nextNumber: Int {
+        (marks.lazy.filter { $0.tool == .number }.map(\.number).max() ?? 0) + 1
+    }
 
     /// A new mark, above the other marks.
     public mutating func add(_ mark: Mark) {

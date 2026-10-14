@@ -177,6 +177,82 @@ import Testing
         #expect(sandbox.pasteboard.data(forType: .png) == saved.data)
     }
 
+    /// YAZ-2841 rows 1.2 and 1.11: select Number, click two times in the box, press Enter. The
+    /// PNG has two red circles with white digits at the places of the clicks, and the original
+    /// pixels in other places. The test runs at scale 2 and at scale 1.
+    @Test(arguments: [
+        (FakeScreenCapture.retinaID, 2),
+        (FakeScreenCapture.plainID, 1),
+    ])
+    func twoNumbersAreInTheSavedImageAtThePixelScaleOfTheScreen(displayID: CGDirectDisplayID, scale: Int) async throws {
+        let sandbox = try Sandbox()
+        let saver = ScreenshotSaver(pasteboard: sandbox.pasteboard, folder: sandbox.folder)
+        let interaction = CaptureInteraction(displays: try await FakeScreenCapture().freezeAllDisplays(), styles: ToolStyleMemory())
+        var outcome: CaptureOutcome?
+        interaction.onFinish = { outcome = $0 }
+
+        // The box: x 20 to 150, y 10 to 70. The numbers: Thick (40 points), with their middles
+        // at x 40 and x 100, y 30 of the box.
+        interaction.pointerDown(at: CGPoint(x: 20, y: 10), on: displayID)
+        interaction.pointerUp(at: CGPoint(x: 150, y: 70))
+        interaction.selectTool(.number)
+        for x: CGFloat in [60, 120] {
+            interaction.pointerDown(at: CGPoint(x: x, y: 40), on: displayID)
+            interaction.pointerUp(at: CGPoint(x: x, y: 40))
+        }
+        interaction.key(.enter)
+
+        try saver.deliver(try #require(outcome), date: day)
+        saver.waitForPendingWrites()
+        let saved = try savedImage(in: sandbox)
+        #expect(saved.image.width == 130 * scale && saved.image.height == 60 * scale)
+        let pixels = PixelReader(saved.image)
+        let red = Pixel(.red)
+        func original(_ x: Int, _ y: Int) -> Pixel { patternPixel(x: 20 * scale + x, y: 10 * scale + y) }
+        func at(_ x: Int, _ y: Int) -> Pixel { pixels[x * scale, y * scale] }
+
+        let middles = [CGPoint(x: 40, y: 30), CGPoint(x: 100, y: 30)]
+        // For each number: the places of its white pixels, from the top-left of its digit area.
+        var digits: [Set<[Int]>] = []
+        for middle in middles {
+            let x = Int(middle.x), y = Int(middle.y)
+            // The circle: red at the left of the digit, above it and below it.
+            #expect(at(x - 15, y).isNear(red) && at(x, y - 17).isNear(red) && at(x, y + 16).isNear(red), "\(middle)")
+            // Just outside the circle: the frozen image.
+            #expect(at(x - 21, y) == original((x - 21) * scale, y * scale), "\(middle)")
+            // The digit: white pixels in the middle of the circle. The pattern has no white pixel.
+            var white = Set<[Int]>()
+            for row in ((y - 12) * scale)..<((y + 12) * scale) {
+                for column in ((x - 12) * scale)..<((x + 12) * scale) where pixels[column, row].isNear(.white, tolerance: 10) {
+                    white.insert([column - (x - 12) * scale, row - (y - 12) * scale])
+                }
+            }
+            #expect(white.count > 40 * scale * scale, "\(middle): \(white.count) white pixels")
+            digits.append(white)
+        }
+        // The digits of 1 and of 2 differ, and the digit 2 has more pixels than the digit 1.
+        #expect(digits[0] != digits[1] && digits[1].count > digits[0].count)
+
+        // Each pixel that changed is in one of the two circles (with 1 point for the soft edge).
+        var changed = 0
+        for y in 0..<pixels.height {
+            for x in 0..<pixels.width where pixels[x, y] != original(x, y) {
+                changed += 1
+                let point = CGPoint(x: (CGFloat(x) + 0.5) / CGFloat(scale), y: (CGFloat(y) + 0.5) / CGFloat(scale))
+                if !middles.contains(where: { hypot(point.x - $0.x, point.y - $0.y) <= 21 }) {
+                    Issue.record("The pixel \(x), \(y) is not in a circle, but it changed")
+                    return
+                }
+            }
+        }
+        // Two circles of 20 points: about 2 x 1257 points.
+        #expect(changed > 2400 * scale * scale)
+        #expect(pixels[0, 0] == original(0, 0) && at(70, 30) == original(70 * scale, 30 * scale))
+
+        // The private pasteboard holds the same PNG.
+        #expect(sandbox.pasteboard.data(forType: .png) == saved.data)
+    }
+
     /// YAZ-2782: draw a red rectangle, move it with "Select", press Enter while it is still selected.
     /// The PNG has the red pixels at the new place and the original pixels at the old place, and
     /// it has no outline and no handle. The test runs at scale 2 and at scale 1.
