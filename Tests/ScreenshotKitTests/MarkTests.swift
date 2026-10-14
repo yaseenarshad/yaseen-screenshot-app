@@ -125,6 +125,42 @@ import Testing
         #expect(MarkSize.allCases.map { MarkStyle(color: .red, size: $0).fontSize } == [14, 18, 24])
         #expect(Tool.allCases.map(\.name) == ["Rectangle", "Ellipse", "Arrow", "Pen", "Highlight", "Text", "Number"])
         #expect(MarkColor.allCases.map(\.name) == ["Red", "Amber", "Green", "Blue", "Black", "White"])
+        // The circle of a Number mark (YAZ-2841 row 1.9).
+        #expect(MarkSize.allCases.map { MarkStyle(color: .red, size: $0).numberDiameter } == [22, 30, 40])
+    }
+
+    /// YAZ-2841 rows 1.4 to 1.6: the next number is the highest number in the box, plus 1.
+    @Test func theNextNumberIsTheHighestNumberPlusOne() {
+        func number(_ value: Int) -> Mark {
+            Mark(tool: .number, style: .initial(for: .number), points: [CGPoint(x: value * 10, y: 20)], number: value)
+        }
+        var list = MarkList()
+        #expect(list.nextNumber == 1)
+        // A mark of a different tool does not count.
+        list.add(mark(1))
+        #expect(list.nextNumber == 1)
+        for value in 1...3 {
+            list.add(number(list.nextNumber))
+            #expect(list.marks.last?.number == value)
+        }
+        #expect(list.nextNumber == 4)
+
+        // Undo of number 3: the next number is 3 again. Redo brings 3 back.
+        list.undo()
+        #expect(list.nextNumber == 3)
+        list.redo()
+        #expect(list.nextNumber == 4 && list.marks.last == number(3))
+
+        // Delete of number 2 of 1 to 5: no renumber, and the next number is 6.
+        list.add(number(4))
+        list.add(number(5))
+        list.remove(at: 2) // the pen mark is at 0, so number 2 is at 2
+        #expect(list.marks.map(\.number) == [0, 1, 3, 4, 5])
+        #expect(list.marks.dropFirst() == [number(1), number(3), number(4), number(5)])
+        #expect(list.nextNumber == 6)
+        // Undo of the delete puts 2 back at its place in the order.
+        list.undo()
+        #expect(list.marks.map(\.number) == [0, 1, 2, 3, 4, 5] && list.nextNumber == 6)
     }
 }
 
@@ -308,6 +344,109 @@ import Testing
         #expect(try render([black, red])[30, 20].isNear(Pixel(.red)))
         #expect(try render([])[30, 20] == .white)
     }
+
+    /// YAZ-2841 row 1.10: a filled circle in the colour of the mark, with bold digits in its
+    /// middle. White digits on red, blue and black. Black digits on amber, green and white.
+    @Test func aNumberIsAFilledCircleWithDigitsInAColourThatIsEasyToRead() throws {
+        // A grey screen, so a white circle and a black circle both show.
+        let grey = Pixel(red: 128, green: 128, blue: 128)
+        for color in MarkColor.allCases {
+            let digit: Pixel = [.red, .blue, .black].contains(color) ? .white : .black
+            for scale in [1, 2] {
+                // Thick is 40 points: the circle fills the screen of 60 by 40 points from top to bottom.
+                let number = Mark(tool: .number, style: MarkStyle(color: color, size: .thick), points: [CGPoint(x: 30, y: 20)], number: 8)
+                let pixels = try render([number], scale: scale, background: { _, _ in grey })
+                func at(_ x: CGFloat, _ y: CGFloat) -> Pixel { pixels[Int(x * CGFloat(scale)), Int(y * CGFloat(scale))] }
+                let name = "\(color.name) at scale \(scale)"
+                // The circle, at the left of the digit and above it. Outside the circle: the screen.
+                #expect(at(14, 20).isNear(Pixel(color)) && at(30, 3).isNear(Pixel(color)), "\(name)")
+                #expect(at(2, 2) == grey && at(57, 37) == grey && at(8, 20) == grey, "\(name)")
+                // The digit: many pixels of the digit colour, all in the middle of the circle.
+                var digitPixels = 0
+                for y in 0..<pixels.height {
+                    for x in 0..<pixels.width where pixels[x, y].isNear(digit, tolerance: 10) {
+                        digitPixels += 1
+                        let dx = CGFloat(x) / CGFloat(scale) - 30, dy = CGFloat(y) / CGFloat(scale) - 20
+                        #expect(abs(dx) < 10 && abs(dy) < 13, "\(name): a digit pixel at \(x), \(y)")
+                    }
+                }
+                // An "8" in a font of 24 points is about 14 by 17 points, with thick strokes.
+                #expect(digitPixels > 60 * scale * scale, "\(name): \(digitPixels) digit pixels")
+                // The middle of an "8" is on the digit, between its two loops.
+                #expect(at(30, 20).isNear(digit, tolerance: 60), "\(name): \(at(30, 20))")
+            }
+        }
+        #expect(MarkRenderer.digitColor(on: .amber) == CGColor(gray: 0, alpha: 1))
+        #expect(MarkRenderer.digitColor(on: .blue) == CGColor(gray: 1, alpha: 1))
+    }
+
+    /// YAZ-2841 row 1.10: a long number gets smaller, so it stays in 70% of the circle.
+    @Test func aLongNumberStaysInsideTheCircle() throws {
+        let red = Pixel(.red)
+        // A grey screen: white digits outside the circle would show on it.
+        let grey = Pixel(red: 128, green: 128, blue: 128)
+        for number in [128, 99_999] {
+            // Thin is 22 points: 70% is 15.4 points.
+            let mark = Mark(tool: .number, style: MarkStyle(color: .red, size: .thin), points: [CGPoint(x: 30, y: 20)], number: number)
+            let pixels = try render([mark], scale: 2, background: { _, _ in grey })
+            var digitColumns = Set<Int>()
+            for y in 0..<pixels.height {
+                for x in 0..<pixels.width {
+                    let dx = CGFloat(x) / 2 + 0.25 - 30, dy = CGFloat(y) / 2 + 0.25 - 20
+                    let distance = hypot(dx, dy)
+                    if distance > 12 {
+                        // Outside the circle: no digit and no red.
+                        #expect(pixels[x, y] == grey, "\(number): \(x), \(y)")
+                    } else if distance < 10.5, !pixels[x, y].isNear(red, tolerance: 10) {
+                        // A pixel in the circle that is not red is a part of the digits.
+                        digitColumns.insert(x)
+                    }
+                }
+            }
+            // The digits are 15.4 points wide at most: 31 pixels, in the middle of the circle.
+            let width = (digitColumns.max() ?? 0) - (digitColumns.min() ?? 0) + 1
+            #expect(width > 20 && width <= 32, "\(number): \(width) pixels wide")
+            #expect(abs(CGFloat((digitColumns.max() ?? 0) + (digitColumns.min() ?? 0)) / 2 - 60) <= 2, "\(number)")
+        }
+    }
+
+    /// The timing check of YAZ-2841: the overlay makes this image again at each move of a drag.
+    /// It compares 100 Number marks with 100 rectangles, on a box of 1000 by 600 points at scale 2.
+    @Test func theTimeToComposeOneHundredNumbers() throws {
+        let size = CGSize(width: 1000, height: 600)
+        let frozen = FrozenDisplay(
+            displayID: 7, image: makeImage(width: 2000, height: 1200) { _, _ in .white },
+            frame: CGRect(origin: .zero, size: size), scale: 2
+        )
+        let selection = try #require(Selection(rect: CGRect(origin: .zero, size: size), in: size))
+        let places = (0..<100).map { (index: Int) -> CGPoint in
+            CGPoint(x: 50 + CGFloat(index % 10) * 90, y: 50 + CGFloat(index / 10) * 55)
+        }
+        let numbers = places.enumerated().map { index, place in
+            Mark(tool: .number, style: MarkStyle(color: .red, size: .thick), points: [place], number: index + 1)
+        }
+        let rectangles = places.map { place in
+            Mark(tool: .rectangle, style: MarkStyle(color: .red, size: .thick), points: [place, CGPoint(x: place.x + 40, y: place.y + 30)])
+        }
+        /// The shortest time of 5 runs, in milliseconds, after one run that loads the font.
+        func milliseconds(_ marks: [Mark]) throws -> Double {
+            _ = try composeImage(frozen: frozen, selection: selection, marks: marks)
+            var best = Duration.seconds(60)
+            for _ in 0..<5 {
+                let clock = ContinuousClock()
+                let start = clock.now
+                _ = try composeImage(frozen: frozen, selection: selection, marks: marks)
+                best = min(best, clock.now - start)
+            }
+            let parts = best.components
+            return Double(parts.seconds) * 1000 + Double(parts.attoseconds) / 1e15
+        }
+        let numberTime = try milliseconds(numbers)
+        let rectangleTime = try milliseconds(rectangles)
+        print("composeImage, 1000 x 600 points at scale 2: 100 numbers \(numberTime) ms, 100 rectangles \(rectangleTime) ms")
+        // A generous ceiling, so a busy computer does not make the test fail.
+        #expect(numberTime < 200)
+    }
 }
 
 /// The geometry of a mark for the Select tool (YAZ-2782): the hit test, the move and the size
@@ -426,6 +565,50 @@ import Testing
         large.add(mark(.rectangle, .thin, [point(5, 5), point(95, 55)]))
         large.add(mark(.rectangle, .thin, [point(30, 20), point(60, 40)]))
         #expect(large.index(at: point(45, 30)) == 1 && large.index(at: point(80, 30)) == 0)
+    }
+
+    /// YAZ-2841 rows 1.8, 1.12 and 1.15: the circle of a Number mark is its hit area, it has no
+    /// handles, a move stops at the edge, and a new number stays half a circle inside the box.
+    @Test func theGeometryOfANumber() {
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
+        // Medium is 30 points: the circle is 15 points around the middle.
+        let number = Mark(tool: .number, style: MarkStyle(color: .red, size: .medium), points: [point(50, 30)], number: 1)
+        #expect(number.bounds == CGRect(x: 35, y: 15, width: 30, height: 30))
+        #expect(number.outline == CGRect(x: 32, y: 12, width: 36, height: 36))
+
+        // A click in the circle, or 6 points around it, selects the number.
+        #expect(number.part(at: point(50, 30)) == .line)
+        #expect(number.part(at: point(50 + 15 + 6, 30)) == .line && number.part(at: point(50 + 15 + 7, 30)) == nil)
+        #expect(number.part(at: point(50, 30 - 15 - 6)) == .line && number.part(at: point(50, 30 - 15 - 7)) == nil)
+        // The corner of the bounds is 21.2 points from the middle: not in the hit area.
+        #expect(number.part(at: point(35, 15)) == nil)
+
+        // No handles: it only moves. The move stops when the circle touches an edge.
+        #expect(number.handles.isEmpty && number.handle(at: point(35, 15)) == nil)
+        #expect(number.moved(by: point(10, 5), in: box).points == [point(60, 35)])
+        #expect(number.moved(by: point(900, 900), in: box).points == [point(85, 45)])
+        #expect(number.moved(by: point(-900, -900), in: box).points == [point(15, 15)])
+        #expect(number.moved(by: point(900, 900), in: box).number == 1)
+
+        // A new number keeps its middle half a circle inside the box, so the full circle shows.
+        let thick = MarkStyle(color: .red, size: .thick) // 40 points
+        #expect(thick.pointInBox(point(0, 0), for: .number, in: box) == point(20, 20))
+        #expect(thick.pointInBox(point(500, 500), for: .number, in: box) == point(80, 40))
+        #expect(thick.pointInBox(point(50, 30), for: .number, in: box) == point(50, 30))
+        #expect(MarkStyle(color: .red, size: .thin).pointInBox(point(0, 70), for: .number, in: box) == point(11, 49))
+        // In a box smaller than the circle, the circle is in the middle of the box.
+        #expect(thick.pointInBox(point(0, 0), for: .number, in: CGSize(width: 30, height: 20)) == point(15, 10))
+        #expect(thick.pointInBox(point(99, 99), for: .number, in: CGSize(width: 30, height: 20)) == point(15, 10))
+
+        // The mark that was drawn last wins, as for each mark. A number on the line of a
+        // rectangle that was drawn later: the rectangle. A number inside a rectangle: the number.
+        var list = MarkList()
+        list.add(number)
+        list.add(mark(.rectangle, .thin, [point(40, 20), point(90, 55)]))
+        #expect(list.index(at: point(40, 30)) == 1)
+        #expect(list.index(at: point(50, 30)) == 0)
+        list.add(Mark(tool: .number, style: thick, points: [point(40, 30)], number: 2))
+        #expect(list.index(at: point(40, 30)) == 2)
     }
 
     /// Row 12: the move stops when the bounds of the mark touch an edge of the box.

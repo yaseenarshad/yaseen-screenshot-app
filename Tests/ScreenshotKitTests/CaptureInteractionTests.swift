@@ -809,6 +809,138 @@ import Testing
         #expect(interaction.marks.isEmpty && !interaction.canUndo)
     }
 
+    // MARK: Number (YAZ-2841)
+
+    /// Rows 1.2 to 1.5, 1.7 to 1.9, 1.17 and 1.18: a pointer down in the box puts the next number at once.
+    @Test func withNumberAClickPutsTheNextNumberAtOnce() async throws {
+        let styles = ToolStyleMemory()
+        let harness = try await harnessWithBox(styles: styles)
+        let interaction = harness.interaction
+        interaction.selectTool(.number)
+        #expect(interaction.tool == .number && interaction.style == MarkStyle(color: .red, size: .thick))
+        #expect(interaction.pointerShape(at: CGPoint(x: 90, y: 50), on: retina) == .crosshair)
+
+        // The pointer down puts number 1 at once. No drag and no release are necessary.
+        let revision = interaction.marksRevision
+        interaction.pointerDown(at: CGPoint(x: 90, y: 50), on: retina)
+        let one = Mark(tool: .number, style: MarkStyle(color: .red, size: .thick), points: [CGPoint(x: 50, y: 30)], number: 1)
+        #expect(interaction.marks.marks == [one] && interaction.marksRevision == revision + 1 && interaction.canUndo)
+        // A drag after it does nothing more: no second mark, no move, and the box stays.
+        interaction.pointerDragged(to: CGPoint(x: 120, y: 70))
+        interaction.pointerUp(at: CGPoint(x: 120, y: 70))
+        #expect(interaction.marks.marks == [one] && interaction.visibleMarks == [one])
+        #expect(harness.rect(on: retina) == boxRect)
+
+        // The second click puts number 2. Near the top-left corner, the middle stays half a
+        // circle (20 points) inside the box, so the full circle shows.
+        harness.click(at: CGPoint(x: 41, y: 21), on: retina)
+        #expect(interaction.marks.marks.map(\.number) == [1, 2])
+        #expect(interaction.marks.marks.last?.points == [CGPoint(x: 20, y: 20)])
+        // A click outside the box, or on the other screen, puts nothing.
+        harness.click(at: CGPoint(x: 10, y: 5), on: retina)
+        harness.click(at: CGPoint(x: 150, y: 50), on: retina)
+        harness.click(at: CGPoint(x: 10, y: 10), on: plain)
+        #expect(interaction.marks.marks.count == 2)
+
+        // A fast double-click, as the view sends it: each pointer down puts a number, and the
+        // double-click does not mean Done while a tool is on.
+        let place = CGPoint(x: 120, y: 60)
+        interaction.pointerDown(at: place, on: retina)
+        interaction.pointerUp(at: place)
+        interaction.pointerDown(at: place, on: retina)
+        interaction.doubleClick(at: place, on: retina)
+        interaction.pointerUp(at: place)
+        #expect(interaction.marks.marks.map(\.number) == [1, 2, 3, 4] && harness.outcomes.isEmpty)
+
+        // One click is one Undo step. After Undo of 4, the next number is 4 again.
+        interaction.undo()
+        #expect(interaction.marks.marks.map(\.number) == [1, 2, 3] && interaction.marks.nextNumber == 4)
+        interaction.redo()
+        interaction.undo()
+
+        // The numbers hold the box, as each mark: no handles, and a right-click does nothing.
+        #expect(!interaction.showsHandles)
+        interaction.secondaryClick()
+        #expect(harness.rect(on: retina) == boxRect && harness.outcomes.isEmpty && interaction.marks.marks.count == 3)
+
+        // A new colour and size apply to the next number. The numbers that exist do not change.
+        interaction.setColor(.blue)
+        interaction.setSize(.medium)
+        harness.click(at: CGPoint(x: 70, y: 40), on: retina)
+        let four = Mark(tool: .number, style: MarkStyle(color: .blue, size: .medium), points: [CGPoint(x: 30, y: 20)], number: 4)
+        #expect(interaction.marks.marks.last == four)
+        #expect(interaction.marks.marks.dropLast().allSatisfy { $0.style == MarkStyle(color: .red, size: .thick) })
+
+        // A new capture starts at 1. Number keeps its last colour and size while the app runs.
+        let next = try await harnessWithBox(styles: styles)
+        next.interaction.selectTool(.number)
+        #expect(next.interaction.style == MarkStyle(color: .blue, size: .medium))
+        next.click(at: CGPoint(x: 90, y: 50), on: retina)
+        #expect(next.interaction.marks.marks.map(\.number) == [1])
+
+        // Enter: the result has the four numbers.
+        interaction.key(.enter)
+        #expect(harness.doneResult?.marks.marks.map(\.number) == [1, 2, 3, 4])
+    }
+
+    /// Rows 1.12 to 1.14 and 1.16: Select moves a number, changes its style, and deletes it.
+    /// Its number never changes.
+    @Test func withSelectANumberMovesChangesItsStyleAndIsDeleted() async throws {
+        let styles = ToolStyleMemory()
+        let harness = try await harnessWithBox(styles: styles)
+        let interaction = harness.interaction
+        interaction.selectTool(.number)
+        // Numbers 1, 2 and 3, Thick, at x 20, 50 and 80 of the box, and y 30.
+        for x: CGFloat in [60, 90, 120] {
+            harness.click(at: CGPoint(x: x, y: 50), on: retina)
+        }
+        let before = interaction.marks.marks
+        #expect(before.map(\.number) == [1, 2, 3])
+        interaction.toggleSelecting()
+
+        // A click 6 points above the circle of number 2 selects it. Higher, it does not.
+        harness.click(at: CGPoint(x: 90, y: 50 - 20 - 7), on: retina)
+        #expect(interaction.selectedIndex == nil)
+        harness.click(at: CGPoint(x: 90, y: 50 - 20 - 6), on: retina)
+        #expect(interaction.selectedIndex == 1 && interaction.selectedMark?.handles.isEmpty == true)
+        #expect(interaction.pointerShape(at: CGPoint(x: 90, y: 50), on: retina) == .openHand)
+
+        // A drag moves it. The move stops when the circle touches the bottom edge of the box.
+        harness.drag(from: CGPoint(x: 90, y: 50), to: CGPoint(x: 90, y: 900), on: retina)
+        #expect(interaction.marks.marks[1].points == [CGPoint(x: 50, y: 40)] && interaction.marks.marks[1].number == 2)
+        #expect(interaction.selectedIndex == 1 && harness.rect(on: retina) == boxRect)
+
+        // A size and a colour change the selected number. Its number does not change.
+        interaction.setSize(.thin)
+        interaction.setColor(.green)
+        let green = Mark(tool: .number, style: MarkStyle(color: .green, size: .thin), points: [CGPoint(x: 50, y: 40)], number: 2)
+        #expect(interaction.marks.marks[1] == green)
+        #expect(styles[.number] == MarkStyle(color: .green, size: .thin))
+        // A larger circle stays in the box: the Thin number goes to the bottom edge, then it gets Thick.
+        harness.drag(from: CGPoint(x: 90, y: 60), to: CGPoint(x: 90, y: 900), on: retina)
+        #expect(interaction.marks.marks[1].points == [CGPoint(x: 50, y: 49)])
+        interaction.setSize(.thick)
+        #expect(interaction.marks.marks[1].points == [CGPoint(x: 50, y: 40)] && interaction.marks.marks[1].number == 2)
+        #expect(interaction.marks.marks[1].bounds.maxY == 60)
+        // The other numbers did not change.
+        #expect(interaction.marks.marks[0] == before[0] && interaction.marks.marks[2] == before[2])
+
+        // Esc clears the selection first, and the capture stays open.
+        interaction.key(.escape)
+        #expect(interaction.selectedIndex == nil && harness.outcomes.isEmpty)
+
+        // Delete removes the selected number. The other numbers keep their numbers.
+        harness.click(at: CGPoint(x: 90, y: 60), on: retina)
+        #expect(interaction.selectedIndex == 1)
+        interaction.key(.delete)
+        #expect(interaction.marks.marks == [before[0], before[2]] && interaction.marks.nextNumber == 4)
+        interaction.undo()
+        #expect(interaction.marks.marks.map(\.number) == [1, 2, 3])
+        // With no selection, Esc cancels the capture.
+        interaction.key(.escape)
+        #expect(harness.isCancelled)
+    }
+
     @Test func escClearsTheSelectionFirstAndCancelsTheCaptureTheSecondTime() async throws {
         // Row 22.
         let harness = try await harnessWithMarks()
