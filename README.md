@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/media/icon.png" width="112" alt="The icon of Yaseen Screenshot: a white Y in four crop corners">
+  <img src="docs/assets/icon.png" width="112" alt="The icon of Yaseen Screenshot: a white Y in four crop corners">
 </p>
 
 <h1 align="center">Yaseen Screenshot</h1>
@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/media/hero.gif" width="860" alt="Press Shift-Command-D, the screen freezes, drag a box, draw a rectangle and an arrow, click Done. The image is copied and saved.">
+  <img src="docs/assets/hero.gif" width="860" alt="Press Shift-Command-D, the screen freezes, drag a box, draw a rectangle and an arrow, click Done. The image is copied and saved.">
 </p>
 
 ## The problem
@@ -46,7 +46,7 @@ Press the hotkey, and all your screens stop. A laptop screen and a wide monitor 
 **So what:** you select what you saw, not what the screen became a second later. And a second monitor is not a problem. That is the reason this app exists.
 
 <p align="center">
-  <img src="docs/media/two-monitors.png" width="860" alt="Two monitors, frozen and dim at the same moment, with a bright box on one of them">
+  <img src="docs/assets/two-monitors.png" width="860" alt="Two monitors, frozen and dim at the same moment, with a bright box on one of them">
 </p>
 
 ### Mark it up, then fix it
@@ -56,7 +56,7 @@ Draw a rectangle, an ellipse, an arrow, a free line, a highlight or a note. Thre
 **So what:** a mark in the wrong place is not a reason to start again.
 
 <p align="center">
-  <img src="docs/media/annotate.gif" width="860" alt="Draw a rectangle, an arrow, a highlight and a note. Then select the rectangle and move it.">
+  <img src="docs/assets/annotate.gif" width="860" alt="Draw a rectangle, an arrow, a highlight and a note. Then select the rectangle and move it.">
 </p>
 
 ### Grab a full window with one click
@@ -66,7 +66,7 @@ Move the pointer over a window, and it becomes bright. Click, and the box is exa
 **So what:** you do not drag along the edges and miss by two pixels.
 
 <p align="center">
-  <img src="docs/media/click-a-window.gif" width="860" alt="The window below the pointer becomes bright. One click puts the box on that window.">
+  <img src="docs/assets/click-a-window.gif" width="860" alt="The window below the pointer becomes bright. One click puts the box on that window.">
 </p>
 
 ### Paste it now, find it later
@@ -76,7 +76,7 @@ Click **Done**, press **Enter**, or double-click in the box. The image goes to y
 **So what:** you paste it into your message immediately, and the file is still there next week.
 
 <p align="center">
-  <img src="docs/media/result.png" width="720" alt="A finished screenshot with marks, as the app saves it">
+  <img src="docs/assets/result.png" width="720" alt="A finished screenshot with marks, as the app saves it">
 </p>
 
 ### Make it yours
@@ -86,7 +86,7 @@ Change the hotkey. Change the save folder. Let the app open when you log in. Tha
 **So what:** it fits your keys and your folders, and there is nothing else to learn.
 
 <p align="center">
-  <img src="docs/media/settings.png" width="560" alt="The settings: Hotkey, Save folder, Open at login">
+  <img src="docs/assets/settings.png" width="560" alt="The settings: Hotkey, Save folder, Open at login">
 </p>
 
 ## Small and fast
