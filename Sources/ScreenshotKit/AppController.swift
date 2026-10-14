@@ -14,6 +14,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
     private let sound: SoundPlaying
     private let hotKeyCenter = HotKeyCenter()
     private let settings: SettingsModel
+    private let toolbarKeys: ToolbarKeys
     private let log = Logger(subsystem: AppController.bundleIdentifier, category: "capture")
 
     private var statusMenu: StatusMenu?
@@ -33,6 +34,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
         self.capturer = capturer
         self.saver = saver
         self.sound = sound
+        toolbarKeys = store.toolbarKeys
         settings = SettingsModel(store: store, hotKeys: hotKeyCenter, loginItem: loginItem)
     }
 
@@ -145,7 +147,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
             let displays = try await capturer.freezeAllDisplays()
             // A hotkey that macOS refused does not work, so the tip of Done must not show it.
             let hotKey = settings.hotKeyProblem == nil ? settings.hotKey : nil
-            let session = CaptureSession(displays: displays, hotKey: hotKey) { [weak self] outcome in
+            let session = CaptureSession(displays: displays, hotKey: hotKey, toolbarKeys: toolbarKeys) { [weak self] outcome in
                 self?.captureEnded(outcome)
             }
             self.session = session

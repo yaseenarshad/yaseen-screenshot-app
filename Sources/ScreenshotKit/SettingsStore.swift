@@ -71,6 +71,9 @@ public final class SettingsStore {
         set { defaults.set(newValue, forKey: Key.playSound) }
     }
 
+    /// The keys of the toolbar (D1, YAZ-2872), in their own store on the same `UserDefaults`.
+    var toolbarKeys: ToolbarKeys { ToolbarKeys(defaults: defaults) }
+
     /// True after the first start tried to register the app as a login item. The app tries one time only.
     public var loginItemWasTried: Bool {
         get { defaults.object(forKey: Key.loginItemWasTried) as? Bool ?? false }

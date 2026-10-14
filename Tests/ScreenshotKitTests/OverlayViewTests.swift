@@ -24,7 +24,10 @@ extension Toolbar {
         init(display: FrozenDisplay, windows: [CGRect] = [], view: ((CaptureInteraction) -> OverlayView)? = nil) {
             self.display = display
             interaction = CaptureInteraction(
-                displays: [display], windows: [display.displayID: windows], styles: ToolStyleMemory()
+                displays: [display],
+                windows: [display.displayID: windows],
+                toolbarKeys: ToolbarKeys(defaults: MemoryDefaults()),
+                styles: ToolStyleMemory()
             )
             self.view = view?(interaction) ?? OverlayView(display: display, interaction: interaction)
             interaction.onChange = { [unowned self] in self.view.refresh() }
@@ -71,7 +74,9 @@ extension Toolbar {
             ))
         }
 
-        func key(_ keyCode: UInt16, _ characters: String = "", flags: NSEvent.ModifierFlags = []) throws -> NSEvent {
+        func key(
+            _ keyCode: UInt16, _ characters: String = "", flags: NSEvent.ModifierFlags = [], isARepeat: Bool = false
+        ) throws -> NSEvent {
             try #require(NSEvent.keyEvent(
                 with: .keyDown,
                 location: .zero,
@@ -81,7 +86,7 @@ extension Toolbar {
                 context: nil,
                 characters: characters,
                 charactersIgnoringModifiers: characters,
-                isARepeat: false,
+                isARepeat: isARepeat,
                 keyCode: keyCode
             ))
         }
@@ -282,9 +287,12 @@ extension Toolbar {
 
     // MARK: The toolbar (YAZ-2767)
 
-    @Test func theTipOfDoneTellsTheKeysAndTheOtherTipsTellTheName() async throws {
+    @Test func eachTipTellsTheNameAndTheKeys() async throws {
         func tip(_ name: String, hotKey: HotKeyCombo?) -> String? {
-            let interaction = CaptureInteraction(displays: [Stage.largeDisplay], hotKey: hotKey, styles: ToolStyleMemory())
+            let interaction = CaptureInteraction(
+                displays: [Stage.largeDisplay], hotKey: hotKey, toolbarKeys: ToolbarKeys(defaults: MemoryDefaults()),
+                styles: ToolStyleMemory()
+            )
             return (Toolbar(interaction: interaction).button(named: name) as? ToolbarButton)?.tip
         }
         #expect(tip("Done", hotKey: .shiftCommandD) == "Done  ↩ or ⇧⌘D")
@@ -292,7 +300,13 @@ extension Toolbar {
         #expect(tip("Done", hotKey: HotKeyCombo(keyCode: UInt32(kVK_F5), modifiers: [.control, .option])) == "Done  ↩ or ⌃⌥F5")
         // macOS refused the hotkey: the tip does not show a key that does not work.
         #expect(tip("Done", hotKey: nil) == "Done  ↩")
-        #expect(tip("Undo", hotKey: .shiftCommandD) == "Undo")
+        // The other tips tell the key too (D3, YAZ-2872).
+        #expect(tip("Undo", hotKey: .shiftCommandD) == "Undo  ⌘Z")
+        #expect(tip("Cancel", hotKey: .shiftCommandD) == "Cancel  Esc")
+        #expect(tip("Rectangle", hotKey: .shiftCommandD) == "Rectangle  R")
+        #expect(tip("Select", hotKey: .shiftCommandD) == "Select  V")
+        #expect(tip("Medium", hotKey: .shiftCommandD) == "Medium  2")
+        #expect(tip("Blue", hotKey: .shiftCommandD) == "Blue  7")
 
         // Done is at the right end of the toolbar. Its tip does not go past the right end.
         let toolbar = Toolbar(interaction: CaptureInteraction(
@@ -395,7 +409,7 @@ extension Toolbar {
             ))
         }
         pen.mouseEntered(with: try hover(.mouseEntered))
-        #expect(!tip.isHidden && tip.stringValue == "Pen")
+        #expect(!tip.isHidden && tip.stringValue == "Pen  W")
         #expect(tip.frame.minY >= toolbar.bounds.maxY && abs(tip.frame.midX - pen.frame.midX) <= 1)
         pen.mouseExited(with: try hover(.mouseExited))
         #expect(tip.isHidden)
@@ -447,6 +461,65 @@ extension Toolbar {
             Issue.record("Cancel must report one cancel")
             return
         }
+    }
+
+    // MARK: The toolbar keys (YAZ-2872)
+
+    /// The flow of the request: drag a box, press R, drag. The result is a rectangle.
+    @Test func dragABoxPressRAndDragGivesARectangle() async throws {
+        let stage = Stage(display: Stage.largeDisplay)
+        let view = stage.view
+        try stage.drag(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 500, y: 300))
+
+        view.keyDown(with: try stage.key(UInt16(kVK_ANSI_R), "r"))
+        #expect(stage.interaction.tool == .rectangle)
+        // The colour key 7 changes the next rectangle to blue.
+        view.keyDown(with: try stage.key(UInt16(kVK_ANSI_7), "7"))
+        try stage.drag(from: CGPoint(x: 150, y: 150), to: CGPoint(x: 250, y: 220))
+        #expect(stage.interaction.marks.marks.map(\.tool) == [.rectangle])
+        #expect(stage.interaction.marks.marks.first?.style.color == .blue)
+
+        // A second R keeps the tool, so the next drag draws and does not move the box (D2).
+        view.keyDown(with: try stage.key(UInt16(kVK_ANSI_R), "r"))
+        try stage.drag(from: CGPoint(x: 300, y: 150), to: CGPoint(x: 400, y: 250))
+        #expect(stage.interaction.marks.marks.count == 2)
+        #expect(stage.boxRect == CGRect(x: 100, y: 100, width: 400, height: 200))
+
+        // A key that stays down changes nothing. Command-O is not a toolbar key. Shift-O is O.
+        view.keyDown(with: try stage.key(UInt16(kVK_ANSI_O), "o", isARepeat: true))
+        #expect(stage.interaction.tool == .rectangle)
+        #expect(!view.performKeyEquivalent(with: try stage.key(UInt16(kVK_ANSI_O), "o", flags: .command)))
+        view.keyDown(with: try stage.key(UInt16(kVK_ANSI_O), "o", flags: .command))
+        #expect(stage.interaction.tool == .rectangle)
+        view.keyDown(with: try stage.key(UInt16(kVK_ANSI_O), "O", flags: .shift))
+        #expect(stage.interaction.tool == .ellipse)
+        #expect(stage.outcomes.isEmpty)
+    }
+
+    /// The letters show only while the pointer is on the toolbar (D3).
+    @Test func theLettersShowOnlyWhileThePointerIsOnTheToolbar() async throws {
+        let stage = Stage(display: Stage.largeDisplay)
+        try stage.drag(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 500, y: 300))
+        stage.view.keyDown(with: try stage.key(UInt16(kVK_ANSI_R), "r"))
+        let toolbar = stage.view.toolbar
+        let rectangle = try #require(toolbar.button(named: "Rectangle") as? ToolbarButton)
+        let blue = try #require(toolbar.button(named: "Blue") as? ToolbarButton)
+        let undo = try #require(toolbar.button(named: "Undo") as? ToolbarButton)
+
+        func pointer(_ type: NSEvent.EventType) throws -> NSEvent {
+            try #require(NSEvent.enterExitEvent(
+                with: type, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                context: nil, eventNumber: 0, trackingNumber: 0, userData: nil
+            ))
+        }
+        #expect(rectangle.keyText == nil && blue.keyText == nil)
+        toolbar.mouseEntered(with: try pointer(.mouseEntered))
+        #expect(rectangle.keyText?.string == "R")
+        #expect(blue.keyText?.string == "7")
+        // Undo has a fixed key. It shows no letter. Its tip names the key.
+        #expect(undo.keyText == nil)
+        toolbar.mouseExited(with: try pointer(.mouseExited))
+        #expect(rectangle.keyText == nil && blue.keyText == nil)
     }
 
     // MARK: The text field and the panel (YAZ-2767 and the keyboard decision on YAZ-2765)
@@ -590,7 +663,7 @@ extension Toolbar {
             with: .mouseEntered, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
             context: nil, eventNumber: 0, trackingNumber: 0, userData: nil
         )))
-        #expect(!tip.isHidden && tip.stringValue == "Select")
+        #expect(!tip.isHidden && tip.stringValue == "Select  V")
 
         // Two marks: a Thick red rectangle, x 90 to 200 and y 80 to 140 of the screen, and the
         // text "Hello" inside it, at 110, 90.

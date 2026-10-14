@@ -427,7 +427,12 @@ final class OverlayView: NSView, NSTextViewDelegate {
         case 36, 76: interaction.key(.enter) // Return, and Enter on the number pad
         case 53: interaction.key(.escape)
         case 51, 117: interaction.key(.delete) // Backspace, and Delete
-        default: break // No call to super: an unknown key must not beep.
+        default:
+            // A key that stays down makes one change only. No call to super: an unknown key must not beep.
+            guard !event.isARepeat,
+                  let key = ToolbarKeys.key(typed: event.charactersIgnoringModifiers, modifiers: event.modifierFlags)
+            else { return }
+            interaction.toolbarKey(key)
         }
     }
 

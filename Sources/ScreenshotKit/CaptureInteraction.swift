@@ -68,6 +68,8 @@ public final class CaptureInteraction {
     public let displays: [FrozenDisplay]
     /// The hotkey that finishes this capture, for the tip of Done. `nil` when macOS refused it.
     public let hotKey: HotKeyCombo?
+    /// The keys of the toolbar. The toolbar shows them, and `toolbarKey` reads them.
+    public let toolbarKeys: ToolbarKeys
     public private(set) var marks = MarkList()
     /// The selected tool. With no tool, a drag changes the box.
     public private(set) var tool: Tool?
@@ -116,11 +118,13 @@ public final class CaptureInteraction {
         displays: [FrozenDisplay],
         windows: [CGDirectDisplayID: [CGRect]] = [:],
         hotKey: HotKeyCombo? = nil,
+        toolbarKeys: ToolbarKeys = ToolbarKeys(defaults: .standard),
         styles: ToolStyleMemory = .shared
     ) {
         self.displays = displays
         self.windows = windows
         self.hotKey = hotKey
+        self.toolbarKeys = toolbarKeys
         self.styles = styles
     }
 
@@ -450,6 +454,27 @@ public final class CaptureInteraction {
         isSelecting = false
         releaseMark()
         onChange?()
+    }
+
+    /// A toolbar key (D2, YAZ-2872): it does the same as a click on its button, with one difference.
+    /// A tool key always selects its tool. A second press does not clear it, so the next drag
+    /// never moves the box by mistake.
+    ///
+    /// A key with no box or during a drag does nothing: the mark in progress keeps its tool and
+    /// its style. While a text is open, the text field has the keyboard and each key is for the typing.
+    public func toolbarKey(_ key: String) {
+        guard !isFinished, box != nil, drag == nil, textEdit == nil, let action = toolbarKeys.action(for: key)
+        else { return }
+        switch action {
+        case .select:
+            if !isSelecting { toggleSelecting() }
+        case .tool(let newTool):
+            if tool != newTool { selectTool(newTool) }
+        case .size(let size):
+            setSize(size)
+        case .color(let color):
+            setColor(color)
+        }
     }
 
     /// A click on "Select" in the toolbar. A second click clears it, as for a tool.

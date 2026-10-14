@@ -46,6 +46,28 @@ Esc or Cancel stops the capture. Nothing is copied and nothing is saved. Esc fir
 
 While marks exist, the box does not move, and a right-click does nothing.
 
+### The toolbar keys
+
+One key selects a tool, a size or a colour. Thus you can drag the box, press R, and drag a rectangle at once.
+
+| Key | Action |
+| --- | --- |
+| V | Select |
+| R | Rectangle |
+| O | Ellipse |
+| A | Arrow |
+| W or P | Pen |
+| H | Highlight |
+| T | Text |
+| N | Number |
+| 1, 2, 3 | Thin, Medium, Thick |
+| 4 to 9 | Red, Amber, Green, Blue, Black, White |
+
+- The keys are the keys of Yaseen Screendraw.
+- A tool key always selects its tool. A second press keeps it. A click on the selected tool still clears it.
+- A key works after the box exists. It does nothing during a drag. While you type a text, each key is for the text.
+- Move the pointer onto the toolbar to see the keys. The tip of each button names its key too.
+
 ### Where the image goes
 
 - On the clipboard, each time.
