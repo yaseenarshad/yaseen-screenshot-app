@@ -53,6 +53,8 @@ public enum MarkRenderer {
             context.strokePath()
         case .text:
             drawText(mark, at: first, in: context)
+        case .number:
+            drawNumber(mark, at: first, in: context)
         }
     }
 
@@ -91,6 +93,55 @@ public enum MarkRenderer {
         }
         path.addLine(to: last)
         return path
+    }
+
+    // MARK: Number
+
+    /// The colour of the digits of a Number mark: white on a dark circle, black on a light
+    /// circle, so the number is easy to read on each of the six colours.
+    static func digitColor(on color: MarkColor) -> CGColor {
+        switch color {
+        case .red, .blue, .black: return CGColor(gray: 1, alpha: 1)
+        case .amber, .green, .white: return CGColor(gray: 0, alpha: 1)
+        }
+    }
+
+    /// A filled circle with the number in its middle. The digits are their outlines, as a path
+    /// that the context fills. Thus they are sharp at each pixel scale. This is the code of the
+    /// Stamp of Screendraw (`makeNumberLayer`), for a context and not a layer.
+    private static func drawNumber(_ mark: Mark, at middle: CGPoint, in context: CGContext) {
+        let diameter = mark.style.numberDiameter
+        // The fill colour is the colour of the mark.
+        context.fillEllipse(in: CGRect(
+            x: middle.x - diameter / 2, y: middle.y - diameter / 2, width: diameter, height: diameter
+        ))
+
+        let font = NSFont.systemFont(ofSize: diameter * 0.6, weight: .bold) as CTFont
+        let text = NSAttributedString(string: String(mark.number), attributes: [.font: font])
+        let digits = CGMutablePath()
+        for run in CTLineGetGlyphRuns(CTLineCreateWithAttributedString(text)) as? [CTRun] ?? [] {
+            let count = CTRunGetGlyphCount(run)
+            var glyphs = [CGGlyph](repeating: 0, count: count)
+            var places = [CGPoint](repeating: .zero, count: count)
+            CTRunGetGlyphs(run, CFRange(location: 0, length: count), &glyphs)
+            CTRunGetPositions(run, CFRange(location: 0, length: count), &places)
+            for (glyph, place) in zip(glyphs, places) {
+                guard let outline = CTFontCreatePathForGlyph(font, glyph, nil) else { continue }
+                digits.addPath(outline, transform: CGAffineTransform(translationX: place.x, y: place.y))
+            }
+        }
+        // A number with many digits gets smaller, so it stays in 70% of the circle.
+        let box = digits.boundingBoxOfPath
+        guard !box.isEmpty else { return }
+        let scale = min(1, diameter * 0.7 / box.width)
+        // The digits have y going up, and the context of the marks has y going down.
+        var toMiddle = CGAffineTransform(translationX: middle.x, y: middle.y)
+            .scaledBy(x: scale, y: -scale)
+            .translatedBy(x: -box.midX, y: -box.midY)
+        context.setFillColor(digitColor(on: mark.style.color))
+        guard let placed = digits.copy(using: &toMiddle) else { return }
+        context.addPath(placed)
+        context.fillPath()
     }
 
     // MARK: Text

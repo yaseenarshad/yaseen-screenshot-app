@@ -123,7 +123,7 @@ import Testing
         let highlightWidths = MarkSize.allCases.map { MarkStyle(color: .red, size: $0).lineWidth(for: .highlight) }
         #expect(highlightWidths == [10, 16, 24])
         #expect(MarkSize.allCases.map { MarkStyle(color: .red, size: $0).fontSize } == [14, 18, 24])
-        #expect(Tool.allCases.map(\.name) == ["Rectangle", "Ellipse", "Arrow", "Pen", "Highlight", "Text"])
+        #expect(Tool.allCases.map(\.name) == ["Rectangle", "Ellipse", "Arrow", "Pen", "Highlight", "Text", "Number"])
         #expect(MarkColor.allCases.map(\.name) == ["Red", "Amber", "Green", "Blue", "Black", "White"])
     }
 }

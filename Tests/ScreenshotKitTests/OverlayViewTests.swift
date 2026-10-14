@@ -299,7 +299,7 @@ extension Toolbar {
             CGRect(x: toolbar.frame.minX, y: 600 - toolbar.frame.maxY, width: toolbar.frame.width, height: toolbar.frame.height)
         }
         // Below the box (8 points), with its right edge on the right edge of the box.
-        #expect(frame() == CGRect(x: 180, y: 308, width: 320, height: 36))
+        #expect(frame() == CGRect(x: 150, y: 308, width: 350, height: 36))
 
         /// The pixels of light text in an area of the dim screen: the text of the size label.
         func lightPixels(x: Range<Int>, y: Range<Int>) throws -> Int {
@@ -319,18 +319,18 @@ extension Toolbar {
         // The toolbar and the label move with the box, also during the drag.
         view.mouseDown(with: try stage.mouse(.leftMouseDown, 300, 200))
         view.mouseDragged(with: try stage.mouse(.leftMouseDragged, 350, 220))
-        #expect(frame() == CGRect(x: 230, y: 328, width: 320, height: 36))
+        #expect(frame() == CGRect(x: 200, y: 328, width: 350, height: 36))
         #expect(try lightPixels(x: 100..<200, y: 78..<95) == 0)
         #expect(try lightPixels(x: 150..<250, y: 98..<115) > 10)
         view.mouseUp(with: try stage.mouse(.leftMouseUp, 350, 220))
         // It follows a size change.
         try stage.drag(from: CGPoint(x: 550, y: 320), to: CGPoint(x: 600, y: 400))
         #expect(stage.boxRect == CGRect(x: 150, y: 120, width: 450, height: 280))
-        #expect(frame() == CGRect(x: 280, y: 408, width: 320, height: 36))
+        #expect(frame() == CGRect(x: 250, y: 408, width: 350, height: 36))
 
         // The buttons, in the order of the toolbar, each with its name.
         // "Select" is the first button (YAZ-2782 row 1).
-        let names = ["Select", "Rectangle", "Ellipse", "Arrow", "Pen", "Highlight", "Text", "Undo", "Cancel", "Done"]
+        let names = ["Select", "Rectangle", "Ellipse", "Arrow", "Pen", "Highlight", "Text", "Number", "Undo", "Cancel", "Done"]
         let buttons = try names.map { try #require(toolbar.button(named: $0)) }
         #expect(buttons.map(\.frame.minX) == buttons.map(\.frame.minX).sorted())
         // Each button has its symbol. A symbol name that macOS does not have gives an empty picture.
@@ -344,7 +344,7 @@ extension Toolbar {
         try stage.press("Rectangle")
         #expect(stage.interaction.tool == .rectangle)
         #expect(!optionsRow.isHidden)
-        #expect(frame() == CGRect(x: 280, y: 408, width: 320, height: 72))
+        #expect(frame() == CGRect(x: 250, y: 408, width: 350, height: 72))
         #expect((toolbar.button(named: "Rectangle") as? ToolbarButton)?.isOn == true)
         // The first time: red and Thick (D15 on YAZ-2782).
         let thick = try #require(toolbar.button(named: "Thick") as? ToolbarButton)
@@ -379,7 +379,7 @@ extension Toolbar {
         // A click on the selected tool clears the selection, and the second row goes away.
         try stage.press("Highlight")
         #expect(stage.interaction.tool == nil && optionsRow.isHidden)
-        #expect(frame() == CGRect(x: 280, y: 408, width: 320, height: 36))
+        #expect(frame() == CGRect(x: 250, y: 408, width: 350, height: 36))
 
         // A mark makes Undo active.
         try stage.press("Arrow")

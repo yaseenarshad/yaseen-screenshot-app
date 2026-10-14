@@ -1,6 +1,6 @@
 import AppKit
 
-/// The toolbar of the box (D8): Select, the six tools, Undo, Cancel and Done. A second row with
+/// The toolbar of the box (D8): Select, the seven tools, Undo, Cancel and Done. A second row with
 /// the three sizes and the six colours shows while a tool is selected, and with Select while a
 /// mark is selected.
 ///
@@ -167,6 +167,7 @@ final class Toolbar: NSView {
         case .pen: return "pencil"
         case .highlight: return "highlighter"
         case .text: return "textformat"
+        case .number: return "1.circle.fill"
         }
     }
 

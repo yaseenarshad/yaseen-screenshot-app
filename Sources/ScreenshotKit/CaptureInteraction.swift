@@ -262,6 +262,8 @@ public final class CaptureInteraction {
             guard let selection = selection, selection.contains(point) else { return }
             if tool == .text {
                 beginText(at: point, in: selection)
+            } else if tool == .number {
+                addNumber(at: point, in: selection)
             } else {
                 drag = .draw(tool: tool, style: styles[tool], start: point)
             }
@@ -608,6 +610,18 @@ public final class CaptureInteraction {
         let y = max(min(point.y - selection.rect.minY - lineHeight / 2, size.height - lineHeight), 0).rounded()
         textEdit = TextEdit(origin: CGPoint(x: x, y: y), wrapWidth: size.width - x, style: style, text: "")
         onChange?()
+    }
+
+    // MARK: Number
+
+    /// A click with Number puts the next number at once, with its middle in the box. A drag
+    /// after it does nothing more. One click is one Undo step.
+    private func addNumber(at point: CGPoint, in selection: Selection) {
+        let style = styles[.number]
+        let inBox = CGPoint(x: point.x - selection.rect.minX, y: point.y - selection.rect.minY)
+        let middle = style.pointInBox(inBox, for: .number, in: selection.rect.size)
+        marks.add(Mark(tool: .number, style: style, points: [middle], number: marks.nextNumber))
+        marksChanged()
     }
 
     // MARK: Changes
