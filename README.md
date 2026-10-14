@@ -83,7 +83,7 @@ Move the pointer over a window, and it becomes bright. Click, and the box is exa
 
 ### Paste it now, find it later
 
-Click **Done**, press **Enter**, or double-click in the box. The image goes to your clipboard and into your Pictures folder, each time, as a sharp PNG.
+Click **Done**, press **Enter**, press the hotkey again, or double-click in the box. The image goes to your clipboard and into your Pictures folder, each time, as a sharp PNG.
 
 **So what:** you paste it into your message immediately, and the file is still there next week.
 
