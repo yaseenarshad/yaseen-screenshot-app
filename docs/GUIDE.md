@@ -40,6 +40,7 @@ Esc or Cancel stops the capture. Nothing is copied and nothing is saved. Esc fir
 
 - **Select:** click a mark to select it. Drag it to move it. Drag a handle to change a rectangle, an ellipse or an arrow. Delete removes it. A double-click on a text opens the text again.
 - **Rectangle, Ellipse, Arrow, Pen, Highlight, Text:** drag in the box to draw. For Text, click, type, and press Return.
+- **Number:** click in the box to put a numbered circle: 1, 2, 3. The next number is the highest number in the box, plus 1.
 - **Sizes and colours:** Thin, Medium and Thick, and six colours. They show when a tool or a mark is selected, and they change the selected mark. Each tool starts with Thick and red. Highlight starts with amber.
 - **Undo:** the button or Command-Z. Shift-Command-Z puts the change back.
 
