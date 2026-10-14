@@ -11,8 +11,8 @@ final class CaptureSession {
     private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
     private var previousApp: NSRunningApplication?
 
-    init(displays: [FrozenDisplay], onEnd: @escaping (CaptureOutcome) -> Void) {
-        self.interaction = CaptureInteraction(displays: displays)
+    init(displays: [FrozenDisplay], hotKey: HotKeyCombo?, onEnd: @escaping (CaptureOutcome) -> Void) {
+        self.interaction = CaptureInteraction(displays: displays, hotKey: hotKey)
         self.onEnd = onEnd
     }
 
@@ -92,6 +92,11 @@ final class CaptureSession {
     private func cancelForOtherApp() {
         previousApp = nil
         interaction.cancel()
+    }
+
+    /// The hotkey, pressed again during this capture.
+    func hotKeyPressed() {
+        interaction.key(.hotKey)
     }
 
     private func end(_ outcome: CaptureOutcome) {

@@ -32,7 +32,7 @@ If you build the app yourself with a fixed certificate, macOS asks one time only
 2. Drag a box. Or click a window: the window below the pointer is bright, and a click puts the box on it.
 3. Adjust the box. Drag inside it to move it. Drag a handle to change its size. A right-click removes it.
 4. Draw marks with the toolbar below the box, if you want.
-5. Press Enter, or click Done. A double-click in the box does the same when nothing is selected in the toolbar.
+5. Press Enter, press the hotkey again, or click Done. A double-click in the box does the same when nothing is selected in the toolbar.
 
 Esc or Cancel stops the capture. Nothing is copied and nothing is saved. Esc first closes an open text, and then clears a selected mark.
 
