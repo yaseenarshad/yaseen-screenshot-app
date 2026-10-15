@@ -328,6 +328,18 @@ private final class FakeLoginItem: LoginItem {
         }
     }
 
+    /// D6 and S22 (YAZ-2879): the choice is stored, and a new store gives it back.
+    @Test func theToolAfterTheBoxIsStored() {
+        withTemporaryDefaults { defaults in
+            let model = SettingsModel(store: SettingsStore(defaults: defaults), hotKeys: FakeHotKeys(), loginItem: FakeLoginItem())
+            #expect(model.startTool == .rectangle)
+            model.setStartTool(.ellipse)
+            #expect(model.startTool == .ellipse && SettingsStore(defaults: defaults).startTool == .ellipse)
+            model.setStartTool(nil)
+            #expect(model.startTool == nil && SettingsStore(defaults: defaults).startTool == nil)
+        }
+    }
+
     /// The form lays out with no window. The lines for a problem make it higher.
     @Test func theFormHasASizeAndGrowsWithTheProblemLines() {
         withTemporaryDefaults { defaults in

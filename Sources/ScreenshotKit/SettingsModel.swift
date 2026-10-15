@@ -182,6 +182,15 @@ final class SettingsModel: ObservableObject {
         onPlaySoundChanged(enabled)
     }
 
+    // MARK: The tool after the box
+
+    /// "Tool after you select an area" (D6, YAZ-2879). A capture reads the setting when it starts,
+    /// so the change works in the next capture.
+    func setStartTool(_ tool: Tool?) {
+        startTool = tool
+        store.startTool = tool
+    }
+
     // MARK: Open at login
 
     var loginItemIsAvailable: Bool { loginItem.isAvailable }
