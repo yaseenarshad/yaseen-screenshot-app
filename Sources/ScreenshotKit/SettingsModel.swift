@@ -24,6 +24,8 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var loginItemProblem: String?
     /// The sound at the end of a capture.
     @Published private(set) var playSound: Bool
+    /// The tool that is on when a box appears (YAZ-2879). `nil` is "None".
+    @Published private(set) var startTool: Tool?
     /// The key of each toolbar action, in lower case (D5, YAZ-2872).
     @Published private var toolbarKeys: [ToolbarAction: String]
     /// The toolbar action whose key waits for a key. The global hotkey stays on: a toolbar key has
@@ -49,6 +51,7 @@ final class SettingsModel: ObservableObject {
         hotKey = store.hotKey
         saveFolder = store.saveFolder
         playSound = store.playSound
+        startTool = store.startTool
         toolbarKeys = store.toolbarKeys.all
         refreshOpenAtLogin()
     }

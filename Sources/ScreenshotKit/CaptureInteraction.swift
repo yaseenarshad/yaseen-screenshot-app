@@ -70,8 +70,10 @@ public final class CaptureInteraction {
     public let hotKey: HotKeyCombo?
     /// The keys of the toolbar. The toolbar shows them, and `toolbarKey` reads them.
     public let toolbarKeys: ToolbarKeys
+    /// The tool that turns on when a box appears where no box was (D3, YAZ-2879). `nil` is "None".
+    public let startTool: Tool?
     public private(set) var marks = MarkList()
-    /// The selected tool. With no tool, a drag changes the box.
+    /// The selected tool. With no tool, a drag in the box moves it. With a tool, it draws.
     public private(set) var tool: Tool?
     /// True while "Select" is selected in the toolbar. Then a click selects a mark, and no tool
     /// draws. It is not a `Tool`, because a `Tool` is also the kind of a mark.
@@ -119,12 +121,14 @@ public final class CaptureInteraction {
         windows: [CGDirectDisplayID: [CGRect]] = [:],
         hotKey: HotKeyCombo? = nil,
         toolbarKeys: ToolbarKeys = ToolbarKeys(defaults: .standard),
+        startTool: Tool? = nil,
         styles: ToolStyleMemory = .shared
     ) {
         self.displays = displays
         self.windows = windows
         self.hotKey = hotKey
         self.toolbarKeys = toolbarKeys
+        self.startTool = startTool
         self.styles = styles
     }
 
@@ -197,8 +201,8 @@ public final class CaptureInteraction {
         case .resizeMark(_, _, let handle, _, _)?: return CaptureInteraction.pointerShape(for: handle)
         default: break
         }
-        // The box is held when marks exist, and when a tool is selected.
-        let boxIsHeld = tool != nil || !marks.isEmpty || textEdit != nil
+        // The box is held when marks exist, or while a text is open.
+        let boxIsHeld = !marks.isEmpty || textEdit != nil
         guard let selection = selection(on: displayID) else {
             return boxIsHeld ? .arrow : .crosshair
         }
@@ -206,7 +210,8 @@ public final class CaptureInteraction {
             return .resize(handle)
         }
         if let tool = tool {
-            guard selection.contains(point) else { return .arrow }
+            // Outside the box, a drag makes a new box while no mark exists (D2, YAZ-2879).
+            guard selection.contains(point) else { return boxIsHeld ? .arrow : .crosshair }
             return tool == .text ? .iBeam : .crosshair
         }
         if isSelecting, !marks.isEmpty {
@@ -268,8 +273,12 @@ public final class CaptureInteraction {
             return
         }
         if let tool = tool {
-            // With a tool, a drag in the box draws. A drag that starts outside the box does nothing.
-            guard let selection = selection, selection.contains(point) else { return }
+            // With a tool, a drag in the box draws. A drag that starts outside the box makes a new
+            // box while no mark exists (D2, YAZ-2879), as with no tool. With marks it does nothing.
+            guard let selection = selection, selection.contains(point) else {
+                if marks.isEmpty { drag = .newBox(display: display, start: point) }
+                return
+            }
             if tool == .text {
                 beginText(at: point, in: selection)
             } else if tool == .number {
@@ -376,8 +385,9 @@ public final class CaptureInteraction {
             }
             return
         }
-        // With a tool or "Select", a double-click does not mean Done. Only Enter and the Done button do.
-        guard tool == nil, selection.contains(point) else { return }
+        // A double-click means Done with no tool, and with a tool that draws by a drag (D4, YAZ-2879):
+        // its two clicks draw nothing. With Text or Number, a click puts a mark, so it is not Done.
+        guard tool != .text, tool != .number, selection.contains(point) else { return }
         done()
     }
 
@@ -664,6 +674,9 @@ public final class CaptureInteraction {
 
     private func setBox(_ selection: Selection, on display: FrozenDisplay) {
         guard box?.display.displayID != display.displayID || box?.selection != selection else { return }
+        // A box where no box was: the tool of the setting turns on (D3, YAZ-2879). A new box that
+        // replaces a box keeps the tool that is on, also when the user turned it off.
+        if box == nil { tool = startTool }
         box = (display, selection)
         // The box changes only while no mark exists. The marks of Undo and Redo belong to the old box.
         marks.clearHistory()

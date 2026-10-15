@@ -30,9 +30,9 @@ If you build the app yourself with a fixed certificate, macOS asks one time only
 
 1. Press Shift-Command-D, or select "Take screenshot" in the menu. All screens freeze.
 2. Drag a box. Or click a window: the window below the pointer is bright, and a click puts the box on it.
-3. Adjust the box. Drag inside it to move it. Drag a handle to change its size. A right-click removes it.
-4. Draw marks with the toolbar below the box, if you want.
-5. Press Enter, press the hotkey again, or click Done. A double-click in the box does the same when nothing is selected in the toolbar.
+3. The Rectangle is on. Drag inside the box to draw. Drag outside it for a new box. Drag a handle to change its size. A right-click removes it. To move the box, click the Rectangle to turn it off, then drag inside the box.
+4. Draw more marks with the toolbar below the box, or with its keys, if you want.
+5. Press Enter, press the hotkey again, or click Done. A double-click in the box does the same, except with Select, Text or Number.
 
 Esc or Cancel stops the capture. Nothing is copied and nothing is saved. Esc first closes an open text, and then clears a selected mark.
 
@@ -48,7 +48,7 @@ While marks exist, the box does not move, and a right-click does nothing.
 
 ### The toolbar keys
 
-One key selects a tool, a size or a colour. Thus you can drag the box, press R, and drag a rectangle at once.
+One key selects a tool, a size or a colour. Thus you can drag the box, press A, and drag an arrow at once.
 
 | Key | Action |
 | --- | --- |

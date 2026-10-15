@@ -12,9 +12,12 @@ final class CaptureSession {
     private var previousApp: NSRunningApplication?
 
     init(
-        displays: [FrozenDisplay], hotKey: HotKeyCombo?, toolbarKeys: ToolbarKeys, onEnd: @escaping (CaptureOutcome) -> Void
+        displays: [FrozenDisplay], hotKey: HotKeyCombo?, toolbarKeys: ToolbarKeys, startTool: Tool?,
+        onEnd: @escaping (CaptureOutcome) -> Void
     ) {
-        self.interaction = CaptureInteraction(displays: displays, hotKey: hotKey, toolbarKeys: toolbarKeys)
+        self.interaction = CaptureInteraction(
+            displays: displays, hotKey: hotKey, toolbarKeys: toolbarKeys, startTool: startTool
+        )
         self.onEnd = onEnd
     }
 

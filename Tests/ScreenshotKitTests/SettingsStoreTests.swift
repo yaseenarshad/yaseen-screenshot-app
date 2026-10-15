@@ -96,6 +96,18 @@ func withTemporaryDefaults<T>(_ body: (UserDefaults) throws -> T) rethrows -> T 
             defaults.set("perhaps", forKey: "playSound")
             #expect(store.playSound == true)
 
+            // The start tool (D1, YAZ-2879): the default and a broken value give the Rectangle.
+            #expect(store.startTool == .rectangle)
+            defaults.set("square", forKey: "startTool")
+            #expect(store.startTool == .rectangle)
+            defaults.set(7, forKey: "startTool")
+            #expect(store.startTool == .rectangle)
+            store.startTool = nil
+            #expect(defaults.object(forKey: "startTool") as? String == "none")
+            #expect(store.startTool == nil)
+            store.startTool = .highlight
+            #expect(SettingsStore(defaults: defaults).startTool == .highlight)
+
             // The numbers 1 and 0 are a switch value, as the `defaults` command writes them.
             defaults.set(NSNumber(value: 0), forKey: "openAtLogin")
             #expect(store.openAtLogin == false)

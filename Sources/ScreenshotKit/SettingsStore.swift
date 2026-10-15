@@ -11,6 +11,7 @@ public final class SettingsStore {
         static let saveFolder = "saveFolder"
         static let openAtLogin = "openAtLogin"
         static let playSound = "playSound"
+        static let startTool = "startTool"
         static let loginItemWasTried = "loginItemWasTried"
     }
 
@@ -69,6 +70,17 @@ public final class SettingsStore {
     public var playSound: Bool {
         get { defaults.object(forKey: Key.playSound) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Key.playSound) }
+    }
+
+    /// The tool that is on when a box appears (D1, YAZ-2879). `nil` is "None". The default is the
+    /// Rectangle. A missing or broken value gives the Rectangle.
+    public var startTool: Tool? {
+        get {
+            guard let name = defaults.object(forKey: Key.startTool) as? String else { return .rectangle }
+            if name == "none" { return nil }
+            return Tool.allCases.first { $0.name.lowercased() == name } ?? .rectangle
+        }
+        set { defaults.set(newValue?.name.lowercased() ?? "none", forKey: Key.startTool) }
     }
 
     /// The keys of the toolbar (D1, YAZ-2872), in their own store on the same `UserDefaults`.
