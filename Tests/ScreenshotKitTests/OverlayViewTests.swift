@@ -21,12 +21,16 @@ extension Toolbar {
         let view: OverlayView
         var outcomes: [CaptureOutcome] = []
 
-        init(display: FrozenDisplay, windows: [CGRect] = [], view: ((CaptureInteraction) -> OverlayView)? = nil) {
+        init(
+            display: FrozenDisplay, windows: [CGRect] = [], startTool: Tool? = nil,
+            view: ((CaptureInteraction) -> OverlayView)? = nil
+        ) {
             self.display = display
             interaction = CaptureInteraction(
                 displays: [display],
                 windows: [display.displayID: windows],
                 toolbarKeys: ToolbarKeys(defaults: MemoryDefaults()),
+                startTool: startTool,
                 styles: ToolStyleMemory()
             )
             self.view = view?(interaction) ?? OverlayView(display: display, interaction: interaction)
@@ -525,6 +529,29 @@ extension Toolbar {
         toolbar.mouseEntered(with: try pointer(.mouseEntered))
         toolbar.isHidden = true
         #expect(rectangle.keyText == nil)
+    }
+
+    // MARK: The start tool (YAZ-2879)
+
+    /// The flow of the request: drag a box, then drag in it. The result is a rectangle, with no key
+    /// and no click on the toolbar.
+    @Test func dragABoxThenDragInItGivesARectangle() async throws {
+        let stage = Stage(display: Stage.largeDisplay, startTool: .rectangle)
+        try stage.drag(from: CGPoint(x: 100, y: 100), to: CGPoint(x: 500, y: 300))
+        let rectangle = try #require(stage.view.toolbar.button(named: "Rectangle") as? ToolbarButton)
+        #expect(rectangle.isOn && !stage.view.toolbar.isHidden)
+
+        try stage.drag(from: CGPoint(x: 150, y: 150), to: CGPoint(x: 250, y: 220))
+        #expect(stage.interaction.marks.marks.map(\.tool) == [.rectangle])
+        #expect(stage.boxRect == CGRect(x: 100, y: 100, width: 400, height: 200))
+
+        // A double-click in the box finishes, also with the Rectangle on.
+        stage.view.mouseDown(with: try stage.mouse(.leftMouseDown, 300, 200, clicks: 2))
+        guard case .done(let result)? = stage.outcomes.first else {
+            Issue.record("A double-click with the Rectangle must finish")
+            return
+        }
+        #expect(result.marks.marks.count == 1)
     }
 
     // MARK: The text field and the panel (YAZ-2767 and the keyboard decision on YAZ-2765)

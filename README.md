@@ -63,7 +63,7 @@ Press the hotkey, and all your screens stop. A laptop screen and a wide monitor 
 
 ### Mark it up, then fix it
 
-Draw a rectangle, an ellipse, an arrow, a free line, a highlight, a note or numbered circles (1, 2, 3). Three sizes and six colours. One key picks each one: drag the box, press **R**, and drag a rectangle. Then click **Select** to move a mark, change its size, change its colour, or delete it.
+Draw a rectangle, an ellipse, an arrow, a free line, a highlight, a note or numbered circles (1, 2, 3). Three sizes and six colours. The Rectangle is on as soon as you let go of the box, so you drag again and it is drawn. One key picks each other tool, size or colour. Then click **Select** to move a mark, change its size, change its colour, or delete it.
 
 **So what:** a mark in the wrong place is not a reason to start again.
 
@@ -93,12 +93,12 @@ Click **Done**, press **Enter**, press the hotkey again, or double-click in the 
 
 ### Make it yours
 
-Change the hotkey. Change the save folder. Turn the screenshot sound on or off. Let the app open when you log in. Change the toolbar keys. That is the full list of settings.
+Change the hotkey. Change the save folder. Turn the screenshot sound on or off. Let the app open when you log in. Pick the tool that is on after you select an area. Change the toolbar keys. That is the full list of settings.
 
 **So what:** it fits your keys and your folders, and there is nothing else to learn.
 
 <p align="center">
-  <img src="docs/assets/settings.png" width="560" alt="The settings: Hotkey, Save folder, Play the screenshot sound, Open at login, and the toolbar keys">
+  <img src="docs/assets/settings.png" width="560" alt="The settings: Hotkey, Save folder, Play the screenshot sound, Open at login, the tool after you select an area, and the toolbar keys">
 </p>
 
 ## The proof

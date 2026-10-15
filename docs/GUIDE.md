@@ -30,9 +30,9 @@ If you build the app yourself with a fixed certificate, macOS asks one time only
 
 1. Press Shift-Command-D, or select "Take screenshot" in the menu. All screens freeze.
 2. Drag a box. Or click a window: the window below the pointer is bright, and a click puts the box on it.
-3. Adjust the box. Drag inside it to move it. Drag a handle to change its size. A right-click removes it.
-4. Draw marks with the toolbar below the box, if you want.
-5. Press Enter, press the hotkey again, or click Done. A double-click in the box does the same when nothing is selected in the toolbar.
+3. The Rectangle is on. Drag inside the box to draw. Drag outside it for a new box. Drag a handle to change its size. A right-click removes it. To move the box, click the Rectangle to turn it off, then drag inside the box.
+4. Draw more marks with the toolbar below the box, or with its keys, if you want.
+5. Press Enter, press the hotkey again, or click Done. A double-click in the box does the same, except with Select, Text or Number.
 
 Esc or Cancel stops the capture. Nothing is copied and nothing is saved. Esc first closes an open text, and then clears a selected mark.
 
@@ -48,7 +48,7 @@ While marks exist, the box does not move, and a right-click does nothing.
 
 ### The toolbar keys
 
-One key selects a tool, a size or a colour. Thus you can drag the box, press R, and drag a rectangle at once.
+One key selects a tool, a size or a colour. Thus you can drag the box, press A, and drag an arrow at once.
 
 | Key | Action |
 | --- | --- |
@@ -78,10 +78,11 @@ One key selects a tool, a size or a colour. Thus you can drag the box, press R, 
 
 The menu has four rows: "Take screenshot", "Open screenshots folder", "Settings…" and "Quit".
 
-"Settings…" has four rows and the toolbar keys:
+"Settings…" has four rows and the toolbar part:
 
 - **Hotkey:** click the field and press the new keys. It needs Command, Control or Option. The default is Shift-Command-D.
 - **Save folder:** the default is `~/Pictures`.
 - **Play the screenshot sound:** the Mac screenshot sound when a capture is done. The default is on. macOS keeps it silent when "Play user interface sound effects" is off.
 - **Open at login:** the default is on. It works only in the installed app.
+- **Tool after you select an area:** the tool that is on when the box appears. The default is Rectangle. "None" turns no tool on: then a drag in the box moves it.
 - **Toolbar keys:** click a key, then type the new key. A key is one letter, digit or punctuation mark, with no Command, Control or Option. A key that a different button has is refused. Esc stops. "Reset to the start keys" gives the keys of the table above again. A new key works in the next capture.

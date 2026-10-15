@@ -19,12 +19,14 @@ import Testing
         init(
             windows: [CGDirectDisplayID: [CGRect]] = [:],
             styles: ToolStyleMemory = ToolStyleMemory(),
-            toolbarKeys: ToolbarKeys = ToolbarKeys(defaults: MemoryDefaults())
+            toolbarKeys: ToolbarKeys = ToolbarKeys(defaults: MemoryDefaults()),
+            startTool: Tool? = nil
         ) async throws {
             interaction = CaptureInteraction(
                 displays: try await FakeScreenCapture().freezeAllDisplays(),
                 windows: windows,
                 toolbarKeys: toolbarKeys,
+                startTool: startTool,
                 styles: styles
             )
             interaction.onChange = { [unowned self] in self.changes += 1 }
@@ -253,7 +255,8 @@ import Testing
         // With a tool and no mark, the handles still show, and a drag in the box draws.
         #expect(interaction.showsHandles)
         #expect(interaction.pointerShape(at: CGPoint(x: 80, y: 50), on: retina) == .crosshair)
-        #expect(interaction.pointerShape(at: CGPoint(x: 10, y: 5), on: retina) == .arrow)
+        // Outside the box, with no mark, a drag makes a new box (D2, YAZ-2879).
+        #expect(interaction.pointerShape(at: CGPoint(x: 10, y: 5), on: retina) == .crosshair)
         interaction.pointerDown(at: CGPoint(x: 60, y: 30), on: retina)
         interaction.pointerDragged(to: CGPoint(x: 90, y: 50))
         // The mark shows during the drag, but it is in the list only after the release.
@@ -268,7 +271,8 @@ import Testing
         // A drag of less than 3 points draws no mark.
         harness.drag(from: CGPoint(x: 60, y: 30), to: CGPoint(x: 61, y: 32), on: retina)
         #expect(interaction.marks.marks.count == 1)
-        // A drag that starts outside the box does nothing.
+        // With a mark, a drag that starts outside the box does nothing.
+        #expect(interaction.pointerShape(at: CGPoint(x: 10, y: 5), on: retina) == .arrow)
         harness.drag(from: CGPoint(x: 10, y: 5), to: CGPoint(x: 100, y: 60), on: retina)
         harness.drag(from: CGPoint(x: 10, y: 10), to: CGPoint(x: 100, y: 60), on: plain)
         #expect(interaction.marks.marks.count == 1)
@@ -290,12 +294,13 @@ import Testing
         ])
         #expect(interaction.marks.marks.count == 3)
 
-        // With a tool selected, a double-click does not mean Done.
+        // With Text, a double-click does not mean Done: a click with Text puts a text (D4, YAZ-2879).
+        interaction.selectTool(.text)
         interaction.doubleClick(at: CGPoint(x: 80, y: 50), on: retina)
         #expect(harness.outcomes.isEmpty)
 
         // With marks and no tool the box is fixed: no handles, no move, no size change, no new box.
-        interaction.selectTool(.pen)
+        interaction.selectTool(.text)
         #expect(interaction.tool == nil)
         #expect(!interaction.showsHandles && interaction.showsToolbar(on: retina))
         #expect(interaction.pointerShape(at: CGPoint(x: 80, y: 50), on: retina) == .arrow)
@@ -566,6 +571,94 @@ import Testing
         #expect(interaction.tool == nil)
         interaction.toolbarKey("q")
         #expect(interaction.tool == .rectangle)
+    }
+
+    // MARK: The start tool (YAZ-2879)
+
+    /// The scenarios S1, S3 to S8, S11, S12, S19 and S20 of the working log YAZ-2880.
+    @Test func theStartToolIsOnWhenABoxAppearsAndADragOutsideMakesANewBox() async throws {
+        let harness = try await Harness(startTool: .rectangle)
+        let interaction = harness.interaction
+
+        // S1: no tool before the box. The Rectangle turns on when the box appears.
+        #expect(interaction.tool == nil)
+        harness.drag(from: CGPoint(x: 40, y: 20), to: CGPoint(x: 140, y: 80), on: retina)
+        #expect(interaction.tool == .rectangle && interaction.showsToolbar(on: retina) && interaction.showsHandles)
+
+        // S7 and S4: outside the box the pointer is a crosshair, and a drag makes a new box. The tool stays.
+        #expect(interaction.pointerShape(at: CGPoint(x: 10, y: 5), on: retina) == .crosshair)
+        harness.drag(from: CGPoint(x: 150, y: 10), to: CGPoint(x: 190, y: 90), on: retina)
+        #expect(harness.rect(on: retina) == CGRect(x: 150, y: 10, width: 40, height: 80))
+        #expect(interaction.tool == .rectangle)
+        // S19: a drag on the other screen makes a new box there.
+        harness.drag(from: CGPoint(x: 10, y: 10), to: CGPoint(x: 110, y: 70), on: plain)
+        #expect(harness.rect(on: plain) == CGRect(x: 10, y: 10, width: 100, height: 60))
+        #expect(harness.rect(on: retina) == nil && interaction.tool == .rectangle)
+
+        // S5: the user turns the tool off. A new box keeps no tool.
+        interaction.selectTool(.rectangle)
+        harness.drag(from: CGPoint(x: 120, y: 80), to: CGPoint(x: 160, y: 120), on: plain)
+        #expect(harness.rect(on: plain) == CGRect(x: 120, y: 80, width: 40, height: 40) && interaction.tool == nil)
+
+        // S11 and S12: a right-click removes the box. The next box gets the start tool again.
+        interaction.secondaryClick()
+        #expect(harness.rect(on: plain) == nil && interaction.tool == nil)
+        harness.drag(from: CGPoint(x: 40, y: 20), to: CGPoint(x: 140, y: 80), on: retina)
+        #expect(interaction.tool == .rectangle)
+
+        // S20: an empty text that is open closes, and a drag outside makes a new box.
+        interaction.selectTool(.text)
+        harness.click(at: CGPoint(x: 60, y: 30), on: retina)
+        #expect(interaction.textEdit != nil)
+        #expect(interaction.pointerShape(at: CGPoint(x: 10, y: 5), on: retina) == .arrow)
+        harness.drag(from: CGPoint(x: 150, y: 10), to: CGPoint(x: 190, y: 90), on: retina)
+        #expect(interaction.textEdit == nil && interaction.marks.isEmpty)
+        #expect(harness.rect(on: retina) == CGRect(x: 150, y: 10, width: 40, height: 80))
+
+        // S3, S6 and S8: a drag in the box draws. With a mark, a drag outside does nothing.
+        interaction.selectTool(.rectangle)
+        harness.drag(from: CGPoint(x: 155, y: 20), to: CGPoint(x: 185, y: 60), on: retina)
+        #expect(interaction.marks.marks.map(\.tool) == [.rectangle])
+        #expect(interaction.pointerShape(at: CGPoint(x: 10, y: 5), on: retina) == .arrow)
+        harness.drag(from: CGPoint(x: 10, y: 5), to: CGPoint(x: 100, y: 60), on: retina)
+        #expect(harness.rect(on: retina) == CGRect(x: 150, y: 10, width: 40, height: 80))
+        #expect(interaction.marks.marks.count == 1 && harness.outcomes.isEmpty)
+    }
+
+    /// S2: a click on a window gives the box and the start tool. S16: "None" works as before.
+    @Test func aWindowClickGetsTheStartToolAndNoneKeepsTheOldRules() async throws {
+        let withTool = try await Harness(windows: [retina: [front, back]], startTool: .ellipse)
+        withTool.drag(from: CGPoint(x: 150, y: 80), to: CGPoint(x: 151, y: 81), on: retina)
+        #expect(withTool.rect(on: retina) == back && withTool.interaction.tool == .ellipse)
+
+        let none = try await Harness()
+        none.drag(from: CGPoint(x: 40, y: 20), to: CGPoint(x: 140, y: 80), on: retina)
+        #expect(none.interaction.tool == nil)
+        // With no tool, a drag in the box moves it.
+        none.drag(from: CGPoint(x: 60, y: 30), to: CGPoint(x: 70, y: 40), on: retina)
+        #expect(none.rect(on: retina) == CGRect(x: 50, y: 30, width: 100, height: 60))
+    }
+
+    /// S13 to S15 (D4): a double-click finishes with no tool and with a drag tool, not with Select,
+    /// Text or Number.
+    @Test func aDoubleClickFinishesWithADragToolButNotWithSelectTextOrNumber() async throws {
+        let inBox = CGPoint(x: 80, y: 50)
+        for tool in [Tool.rectangle, .ellipse, .arrow, .pen, .highlight] {
+            let harness = try await harnessWithBox()
+            harness.interaction.selectTool(tool)
+            harness.interaction.doubleClick(at: inBox, on: retina)
+            #expect(harness.doneSelection?.rect == boxRect, "\(tool)")
+        }
+        for tool in [Tool.text, .number] {
+            let harness = try await harnessWithBox()
+            harness.interaction.selectTool(tool)
+            harness.interaction.doubleClick(at: inBox, on: retina)
+            #expect(harness.outcomes.isEmpty, "\(tool)")
+        }
+        let select = try await harnessWithBox()
+        select.interaction.toggleSelecting()
+        select.interaction.doubleClick(at: inBox, on: retina)
+        #expect(select.outcomes.isEmpty)
     }
 
     // MARK: Select a mark (YAZ-2782)

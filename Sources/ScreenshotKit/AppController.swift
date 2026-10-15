@@ -147,7 +147,9 @@ public final class AppController: NSObject, NSApplicationDelegate {
             let displays = try await capturer.freezeAllDisplays()
             // A hotkey that macOS refused does not work, so the tip of Done must not show it.
             let hotKey = settings.hotKeyProblem == nil ? settings.hotKey : nil
-            let session = CaptureSession(displays: displays, hotKey: hotKey, toolbarKeys: toolbarKeys) { [weak self] outcome in
+            let session = CaptureSession(
+                displays: displays, hotKey: hotKey, toolbarKeys: toolbarKeys, startTool: settings.startTool
+            ) { [weak self] outcome in
                 self?.captureEnded(outcome)
             }
             self.session = session

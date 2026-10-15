@@ -2,7 +2,8 @@ import AppKit
 import Carbon.HIToolbox
 import SwiftUI
 
-/// The four rows of the settings window (D10, YAZ-2866), and the toolbar keys (D5, YAZ-2872).
+/// The four rows of the settings window (D10, YAZ-2866), then the toolbar part: the tool after the box
+/// (D6, YAZ-2879) and the toolbar keys (D5, YAZ-2872).
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     let chooseFolder: () -> Void
@@ -55,7 +56,14 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Toolbar keys") {
+            Section("Toolbar") {
+                Picker("Tool after you select an area", selection: Binding(
+                    get: { model.startTool },
+                    set: { model.setStartTool($0) }
+                )) {
+                    Text("None").tag(Tool?.none)
+                    ForEach(Tool.allCases, id: \.self) { Text($0.name).tag(Tool?.some($0)) }
+                }
                 toolbarKeys
             }
         }
