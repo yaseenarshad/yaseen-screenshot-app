@@ -63,21 +63,18 @@ import Testing
     @Test func aDragOfLessThan3PointsMakesNoBox() async throws {
         let harness = try await Harness()
         let interaction = harness.interaction
-        #expect(interaction.showsHint)
 
         interaction.pointerDown(at: CGPoint(x: 50, y: 50), on: retina)
         interaction.pointerDragged(to: CGPoint(x: 52, y: 51))
         interaction.pointerUp(at: CGPoint(x: 52, y: 51))
         #expect(interaction.selection(on: retina) == nil)
-        #expect(interaction.showsHint)
         #expect(harness.changes == 0)
 
-        // At 3 points the box starts, and the hint goes away.
+        // At 3 points the box starts.
         interaction.pointerDown(at: CGPoint(x: 50, y: 50), on: retina)
         interaction.pointerDragged(to: CGPoint(x: 53, y: 50))
         // The smallest box is 4 by 4 points (YAZ-2766 row 6).
         #expect(interaction.selection(on: retina)?.rect == CGRect(x: 50, y: 50, width: 4, height: 4))
-        #expect(!interaction.showsHint)
         #expect(harness.changes == 1)
 
         // After the box started, it follows the pointer back to below 3 points.
@@ -168,7 +165,6 @@ import Testing
 
         interaction.secondaryClick()
         #expect(interaction.selection(on: retina) == nil)
-        #expect(interaction.showsHint)
         #expect(harness.outcomes.isEmpty)
 
         interaction.secondaryClick()
@@ -1284,7 +1280,6 @@ import Testing
         interaction.pointerMoved(to: CGPoint(x: 30, y: 20), on: plain)
         #expect(interaction.highlight(on: retina) == nil)
         #expect(interaction.highlight(on: plain) == CGRect(x: 0, y: 0, width: 300, height: 150))
-        #expect(interaction.showsHint)
     }
 
     @Test func theWindowListCanArriveAfterTheCaptureStarted() async throws {
@@ -1307,7 +1302,7 @@ import Testing
         // A click with no drag where no window is: nothing happens.
         harness.click(at: CGPoint(x: 190, y: 5), on: retina)
         harness.click(at: CGPoint(x: 30, y: 20), on: plain)
-        #expect(interaction.showsHint && harness.outcomes.isEmpty)
+        #expect(harness.rect(on: retina) == nil && harness.rect(on: plain) == nil && harness.outcomes.isEmpty)
 
         // A click on a window (a move of less than 3 points is still a click): the box is that window,
         // with the handles and the toolbar, as after a drag.
