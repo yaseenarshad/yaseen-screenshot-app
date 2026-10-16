@@ -141,10 +141,14 @@ extension Toolbar {
     @Test func aMouseDragMakesTheBoxAndTheOverlayShowsItWithItsHandles() async throws {
         let stage = try await Stage.retina()
         let view = stage.view
-        // Before a drag, the full screen is dim: each pixel is darker than the frozen image.
+        // Before a drag, the full screen is dim. The dim is 55% black, so a pixel keeps 45% of the
+        // frozen image (YAZ-2910). The center of the screen is the same: no text is there.
         let before = try stage.renderedPixels()
-        #expect(before[60, 40].red < patternPixel(x: 60, y: 40).red)
-        #expect(before[60, 40].green < patternPixel(x: 60, y: 40).green)
+        for (x, y) in [(60, 40), (200, 100)] {
+            let frozen = patternPixel(x: x, y: y)
+            #expect(abs(Int(before[x, y].red) - Int(frozen.red) * 45 / 100) <= 1)
+            #expect(abs(Int(before[x, y].green) - Int(frozen.green) * 45 / 100) <= 1)
+        }
         #expect(view.toolbar.isHidden)
 
         view.mouseDown(with: try stage.mouse(.leftMouseDown, 20, 10))

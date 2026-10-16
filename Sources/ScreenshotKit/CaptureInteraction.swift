@@ -139,11 +139,6 @@ public final class CaptureInteraction {
         box?.display.displayID == displayID ? box?.selection : nil
     }
 
-    /// The text "Drag to select" shows on every screen while no box exists.
-    public var showsHint: Bool {
-        box == nil
-    }
-
     /// The frame of the window below the pointer, on the screen that has the pointer.
     /// A click selects it. It shows only while no box exists.
     public func highlight(on displayID: CGDirectDisplayID) -> CGRect? {

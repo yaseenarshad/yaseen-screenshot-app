@@ -10,7 +10,7 @@ import AppKit
 /// box. The frozen image is never drawn again.
 final class OverlayView: NSView, NSTextViewDelegate {
     private static let borderColor = CGColor(srgbRed: 0.10, green: 0.55, blue: 1.0, alpha: 1)
-    private static let dimColor = CGColor(gray: 0, alpha: 0.45)
+    private static let dimColor = CGColor(gray: 0, alpha: 0.55)
     /// The side of a handle that the user sees. Its hit area is larger (`Selection.handleHitSide`).
     private static let handleSide: CGFloat = 7
     private static let labelAttributes: [NSAttributedString.Key: Any] = [
@@ -38,7 +38,6 @@ final class OverlayView: NSView, NSTextViewDelegate {
     private let handlesLayer = CAShapeLayer()
     private let labelLayer = CALayer()
     private let labelTextLayer = CATextLayer()
-    private let hintLayer = CALayer()
     let toolbar: Toolbar
 
     /// The field of the text that is open. `nil` when the user types no text.
@@ -88,7 +87,6 @@ final class OverlayView: NSView, NSTextViewDelegate {
         labelLayer.backgroundColor = CGColor(gray: 0, alpha: 0.7)
         labelLayer.cornerRadius = 3
         labelLayer.addSublayer(labelTextLayer)
-        makeHint()
 
         // No implicit animation: the box must follow the pointer at once.
         let noActions: [String: CAAction] = [
@@ -96,7 +94,7 @@ final class OverlayView: NSView, NSTextViewDelegate {
             "contents": NSNull(), "string": NSNull(),
         ]
         let sublayers = [
-            dimLayer, marksLayer, borderLayer, markOutlineLayer, markDashLayer, handlesLayer, labelLayer, hintLayer,
+            dimLayer, marksLayer, borderLayer, markOutlineLayer, markDashLayer, handlesLayer, labelLayer,
         ]
         for sublayer in sublayers {
             sublayer.contentsScale = display.scale
@@ -138,7 +136,6 @@ final class OverlayView: NSView, NSTextViewDelegate {
 
         // The border is outside the box, so it hides no pixel of the box.
         borderLayer.path = bright.map { CGPath(rect: $0.insetBy(dx: -0.5, dy: -0.5), transform: nil) }
-        hintLayer.isHidden = !interaction.showsHint
 
         // The selected mark is in the points of the box. Its outline and its handles are paths,
         // so a new selection makes no image.
@@ -232,32 +229,6 @@ final class OverlayView: NSView, NSTextViewDelegate {
         marksLayer.contents = try? composeImage(frozen: display, selection: selection, marks: marks)
         marksLayer.isHidden = false
         shownMarks = (interaction.marksRevision, selection.rect)
-    }
-
-    private func makeHint() {
-        let text = NSAttributedString(
-            string: "Drag to select. Esc to cancel.",
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 15, weight: .medium),
-                .foregroundColor: NSColor.white,
-            ]
-        )
-        let textSize = text.size()
-        let size = CGSize(width: ceil(textSize.width) + 32, height: ceil(textSize.height) + 16)
-        hintLayer.frame = CGRect(
-            x: ((bounds.width - size.width) / 2).rounded(),
-            y: ((bounds.height - size.height) / 2).rounded(),
-            width: size.width,
-            height: size.height
-        )
-        hintLayer.backgroundColor = CGColor(gray: 0, alpha: 0.6)
-        hintLayer.cornerRadius = 8
-
-        let textLayer = CATextLayer()
-        textLayer.string = text
-        textLayer.contentsScale = display.scale
-        textLayer.frame = CGRect(x: 16, y: 8, width: ceil(textSize.width), height: ceil(textSize.height))
-        hintLayer.addSublayer(textLayer)
     }
 
     // MARK: The text field
