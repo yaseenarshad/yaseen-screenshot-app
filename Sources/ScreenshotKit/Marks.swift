@@ -476,3 +476,42 @@ public final class ToolStyleMemory {
         set { styles[tool] = newValue }
     }
 }
+
+/// The mark that Command-C or Command-X took last (YAZ-3148). It lives while the app runs,
+/// as `ToolStyleMemory`, so a mark can go into the next capture too. It is not the pasteboard
+/// of macOS: Done puts the image there, and a mark must not replace a copy from a different app.
+public final class MarkClipboard {
+    /// The clipboard of the app. A capture uses it unless it gets its own (the tests do).
+    public static let shared = MarkClipboard()
+    /// A paste after a copy goes this far to the right and down (D2).
+    public static let pasteOffset: CGFloat = 16
+
+    private var mark: Mark?
+    /// After a cut, the first paste goes to the same place (D2).
+    private var offset: CGFloat = 0
+
+    public init() {}
+
+    /// Command-C. The first paste goes 16 points to the right and down, so the copy is visible.
+    public func copy(_ mark: Mark) {
+        self.mark = mark
+        offset = MarkClipboard.pasteOffset
+    }
+
+    /// Command-X. The mark is gone from the box, so the first paste puts it back at its place.
+    public func cut(_ mark: Mark) {
+        self.mark = mark
+        offset = 0
+    }
+
+    /// The mark of the next paste, in a box of `size`, or `nil` when nothing was copied. The
+    /// next paste starts from this one, so the copies do not cover each other (D2). A Number
+    /// mark keeps its number (D4).
+    public func nextPaste(in size: CGSize) -> Mark? {
+        guard let mark = mark else { return nil }
+        let pasted = mark.moved(by: CGPoint(x: offset, y: offset), in: size)
+        self.mark = pasted
+        offset = MarkClipboard.pasteOffset
+        return pasted
+    }
+}

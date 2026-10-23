@@ -407,7 +407,8 @@ final class OverlayView: NSView, NSTextViewDelegate {
         }
     }
 
-    /// Command-Z and Shift-Command-Z. The app has no Edit menu, so the keys of the menu come here.
+    /// Command-Z, Shift-Command-Z, and Command-C, X and V for the selected mark (YAZ-3148).
+    /// The app has no Edit menu, so the keys of the menu come here.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard event.type == .keyDown, flags.contains(.command), !flags.contains(.control), !flags.contains(.option)
@@ -433,8 +434,14 @@ final class OverlayView: NSView, NSTextViewDelegate {
             }
             return true
         }
-        guard keys.contains("z") else { return super.performKeyEquivalent(with: event) }
-        interaction.key(isShift ? .redo : .undo)
+        if keys.contains("z") {
+            interaction.key(isShift ? .redo : .undo)
+        } else if isShift || !(keys.contains("c") || keys.contains("x") || keys.contains("v")) {
+            return super.performKeyEquivalent(with: event)
+        } else if !event.isARepeat {
+            // A key that stays down makes one copy, one cut or one paste, as a toolbar key.
+            interaction.key(keys.contains("c") ? .copy : keys.contains("x") ? .cut : .paste)
+        }
         return true
     }
 

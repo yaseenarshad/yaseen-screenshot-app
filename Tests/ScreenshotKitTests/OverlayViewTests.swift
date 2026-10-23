@@ -31,7 +31,8 @@ extension Toolbar {
                 windows: [display.displayID: windows],
                 toolbarKeys: ToolbarKeys(defaults: MemoryDefaults()),
                 startTool: startTool,
-                styles: ToolStyleMemory()
+                styles: ToolStyleMemory(),
+                clipboard: MarkClipboard()
             )
             self.view = view?(interaction) ?? OverlayView(display: display, interaction: interaction)
             interaction.onChange = { [unowned self] in self.view.refresh() }
@@ -927,5 +928,32 @@ extension Toolbar {
             let found = try corners(handle)
             #expect(found.topRight > 5 && found.topLeft == 0, "handle \(handle)")
         }
+    }
+
+    /// YAZ-3148: with no text field open, Command-C, X and V reach the capture. A key that stays
+    /// down makes one paste only, and Shift-Command-V is not for the overlay (rows 20 and 21 on YAZ-3150).
+    @Test func commandCXAndVCopyCutAndPasteTheSelectedMarkAndAKeyRepeatMakesNoSecondPaste() async throws {
+        let stage = try await Stage.retina()
+        let view = stage.view, interaction = stage.interaction
+        try stage.drag(from: CGPoint(x: 20, y: 10), to: CGPoint(x: 180, y: 90))
+        interaction.selectTool(.rectangle)
+        try stage.drag(from: CGPoint(x: 40, y: 20), to: CGPoint(x: 80, y: 50))
+        interaction.toggleSelecting()
+        try stage.click(at: CGPoint(x: 40, y: 35))
+        #expect(interaction.selectedIndex == 0)
+        func command(_ keyCode: Int, _ key: String, shift: Bool = false, isARepeat: Bool = false) throws -> Bool {
+            let flags: NSEvent.ModifierFlags = shift ? [.command, .shift] : .command
+            return view.performKeyEquivalent(with: try stage.key(UInt16(keyCode), key, flags: flags, isARepeat: isARepeat))
+        }
+
+        #expect(try command(kVK_ANSI_C, "c"))
+        #expect(try command(kVK_ANSI_V, "v"))
+        #expect(interaction.marks.marks.count == 2 && interaction.selectedIndex == 1)
+        #expect(try command(kVK_ANSI_V, "v", isARepeat: true))
+        #expect(interaction.marks.marks.count == 2)
+        #expect(try !command(kVK_ANSI_V, "V", shift: true))
+        #expect(interaction.marks.marks.count == 2)
+        #expect(try command(kVK_ANSI_X, "x"))
+        #expect(interaction.marks.marks.count == 1 && interaction.selectedIndex == nil)
     }
 }

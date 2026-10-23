@@ -63,7 +63,7 @@ Press the hotkey, and all your screens stop. A laptop screen and a wide monitor 
 
 ### Mark it up, then fix it
 
-Draw a rectangle, an ellipse, an arrow, a free line, a highlight, a note or numbered circles (1, 2, 3). Three sizes and six colours. The Rectangle is on as soon as you let go of the box, so you drag again and it is drawn. One key picks each other tool, size or colour. Then click **Select** to move a mark, change its size, change its colour, or delete it.
+Draw a rectangle, an ellipse, an arrow, a free line, a highlight, a note or numbered circles (1, 2, 3). Three sizes and six colours. The Rectangle is on as soon as you let go of the box, so you drag again and it is drawn. One key picks each other tool, size or colour. Then click **Select** to move a mark, change its size, change its colour, copy it, or delete it.
 
 **So what:** a mark in the wrong place is not a reason to start again.
 
