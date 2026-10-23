@@ -492,11 +492,13 @@ public final class MarkClipboard {
 
     public init() {}
 
+    /// Command-C. The first paste goes 16 points to the right and down, so the copy is visible.
     public func copy(_ mark: Mark) {
         self.mark = mark
         offset = MarkClipboard.pasteOffset
     }
 
+    /// Command-X. The mark is gone from the box, so the first paste puts it back at its place.
     public func cut(_ mark: Mark) {
         self.mark = mark
         offset = 0

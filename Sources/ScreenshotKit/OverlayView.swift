@@ -439,7 +439,7 @@ final class OverlayView: NSView, NSTextViewDelegate {
         } else if isShift || !(keys.contains("c") || keys.contains("x") || keys.contains("v")) {
             return super.performKeyEquivalent(with: event)
         } else if !event.isARepeat {
-            // A key that stays down makes one copy only, as a toolbar key.
+            // A key that stays down makes one copy, one cut or one paste, as a toolbar key.
             interaction.key(keys.contains("c") ? .copy : keys.contains("x") ? .cut : .paste)
         }
         return true
