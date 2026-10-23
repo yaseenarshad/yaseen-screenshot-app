@@ -454,4 +454,78 @@ private final class CountingSound: SoundPlaying {
         #expect(sandbox.fileNames == ["Snip20261012_1.png"])
         #expect(try Data(contentsOf: sandbox.folder.appendingPathComponent("Snip20261012_1.png")) == failure.png)
     }
+
+    /// YAZ-3148, the end-to-end flow: draw a red rectangle, copy it with "Select", paste it, and
+    /// press Enter while the copy is selected. The PNG has both rectangles, 16 points apart, and no
+    /// outline and no handle. The test runs at scale 2 and at scale 1.
+    @Test(arguments: [
+        (FakeScreenCapture.retinaID, 2),
+        (FakeScreenCapture.plainID, 1),
+    ])
+    func aCopiedAndPastedRectangleIsSavedTwice16PointsApartWithNoOutline(displayID: CGDirectDisplayID, scale: Int) async throws {
+        let sandbox = try Sandbox()
+        let saver = ScreenshotSaver(pasteboard: sandbox.pasteboard, folder: sandbox.folder)
+        let interaction = CaptureInteraction(
+            displays: try await FakeScreenCapture().freezeAllDisplays(), styles: ToolStyleMemory(), clipboard: MarkClipboard()
+        )
+        var outcome: CaptureOutcome?
+        interaction.onFinish = { outcome = $0 }
+
+        // The box: x 20 to 150, y 10 to 70. The rectangle in it: x 20 to 80, y 10 to 40 of the box.
+        interaction.pointerDown(at: CGPoint(x: 20, y: 10), on: displayID)
+        interaction.pointerUp(at: CGPoint(x: 150, y: 70))
+        interaction.selectTool(.rectangle)
+        // Medium: a line of 4 points has whole pixels at each scale.
+        interaction.setSize(.medium)
+        interaction.pointerDown(at: CGPoint(x: 40, y: 20), on: displayID)
+        interaction.pointerUp(at: CGPoint(x: 100, y: 50))
+
+        // "Select", a click on the left line, Command-C and Command-V. The copy is x 36 to 96, y 26 to 56.
+        interaction.toggleSelecting()
+        interaction.pointerDown(at: CGPoint(x: 40, y: 35), on: displayID)
+        interaction.pointerUp(at: CGPoint(x: 40, y: 35))
+        interaction.key(.copy)
+        interaction.key(.paste)
+        #expect(interaction.marks.marks.map(\.frame) == [
+            CGRect(x: 20, y: 10, width: 60, height: 30), CGRect(x: 36, y: 26, width: 60, height: 30),
+        ])
+        #expect(interaction.selectedMark?.handles.count == 8)
+        interaction.key(.enter)
+
+        try saver.deliver(try #require(outcome), date: day)
+        saver.waitForPendingWrites()
+        let saved = try savedImage(in: sandbox)
+        #expect(saved.image.width == 130 * scale && saved.image.height == 60 * scale)
+        let pixels = PixelReader(saved.image)
+        let red = Pixel(.red)
+
+        // The line is 4 points wide around each rectangle.
+        func isOnTheLine(_ x: Int, _ y: Int, offset: Int) -> Bool {
+            let isInOuterEdge = ((18 + offset) * scale..<(82 + offset) * scale).contains(x)
+                && ((8 + offset) * scale..<(42 + offset) * scale).contains(y)
+            let isInInnerEdge = ((22 + offset) * scale..<(78 + offset) * scale).contains(x)
+                && ((12 + offset) * scale..<(38 + offset) * scale).contains(y)
+            return isInOuterEdge && !isInInnerEdge
+        }
+        // Each pixel on a line is red. Each other pixel is the pixel of the frozen image: also the
+        // places of the outline and of the handles of the selected copy.
+        var redPixels = 0
+        for y in 0..<pixels.height {
+            for x in 0..<pixels.width {
+                if isOnTheLine(x, y, offset: 0) || isOnTheLine(x, y, offset: 16) {
+                    redPixels += 1
+                    if !pixels[x, y].isNear(red) {
+                        Issue.record("The pixel \(x), \(y) is on a line, but it is \(pixels[x, y])")
+                        return
+                    }
+                } else if pixels[x, y] != patternPixel(x: 20 * scale + x, y: 10 * scale + y) {
+                    Issue.record("The pixel \(x), \(y) is not on a line, but it changed to \(pixels[x, y])")
+                    return
+                }
+            }
+        }
+        // Two lines of 720 points each. They cross at two places of 4 by 4 points (16 points each).
+        #expect(redPixels == (2 * 720 - 2 * 16) * scale * scale)
+        #expect(sandbox.pasteboard.data(forType: .png) == saved.data)
+    }
 }

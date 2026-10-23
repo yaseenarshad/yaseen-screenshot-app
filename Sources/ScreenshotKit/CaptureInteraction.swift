@@ -13,6 +13,8 @@ public enum CaptureKey {
     case redo
     /// Delete or Backspace.
     case delete
+    /// Command-C, Command-X and Command-V: the selected mark (YAZ-3148).
+    case copy, cut, paste
 }
 
 /// What a finished capture hands over: enough to make the final image.
@@ -104,6 +106,8 @@ public final class CaptureInteraction {
     /// The windows that a click can select: for each screen, their frames from the front to the back.
     private var windows: [CGDirectDisplayID: [CGRect]]
     private let styles: ToolStyleMemory
+    /// Where Command-C puts a mark. The app has one, so a mark can go into the next capture.
+    private let clipboard: MarkClipboard
     private var box: (display: FrozenDisplay, selection: Selection)?
     private var drag: Drag?
     /// False until the pointer of the current drag moved `minimumDrag` points.
@@ -122,7 +126,8 @@ public final class CaptureInteraction {
         hotKey: HotKeyCombo? = nil,
         toolbarKeys: ToolbarKeys = ToolbarKeys(defaults: .standard),
         startTool: Tool? = nil,
-        styles: ToolStyleMemory = .shared
+        styles: ToolStyleMemory = .shared,
+        clipboard: MarkClipboard = .shared
     ) {
         self.displays = displays
         self.windows = windows
@@ -130,6 +135,7 @@ public final class CaptureInteraction {
         self.toolbarKeys = toolbarKeys
         self.startTool = startTool
         self.styles = styles
+        self.clipboard = clipboard
     }
 
     // MARK: What the views read
@@ -436,6 +442,12 @@ public final class CaptureInteraction {
             redo()
         case .delete:
             deleteSelectedMark()
+        case .copy:
+            copySelectedMark()
+        case .cut:
+            cutSelectedMark()
+        case .paste:
+            paste()
         }
     }
 
@@ -549,6 +561,31 @@ public final class CaptureInteraction {
         guard let index = selectedIndex else { return }
         releaseMark()
         marks.remove(at: index)
+        marksChanged()
+    }
+
+    /// Command-C: the selected mark goes to the clipboard of marks. The marks do not change.
+    public func copySelectedMark() {
+        guard !isFinished, drag == nil, let mark = selectedMark else { return }
+        clipboard.copy(mark)
+    }
+
+    /// Command-X: a copy, then a delete. It is one Undo step: the delete.
+    public func cutSelectedMark() {
+        guard !isFinished, drag == nil, let mark = selectedMark else { return }
+        clipboard.cut(mark)
+        deleteSelectedMark()
+    }
+
+    /// Command-V: a copy of the mark of the clipboard, above the other marks. One Undo step.
+    public func paste() {
+        guard !isFinished, drag == nil, textEdit == nil, let size = box?.selection.rect.size,
+              let mark = clipboard.nextPaste(in: size) else { return }
+        marks.add(mark)
+        // The new mark is selected, with "Select", so a drag moves it at once (D3).
+        tool = nil
+        isSelecting = true
+        selectedIndex = marks.marks.count - 1
         marksChanged()
     }
 

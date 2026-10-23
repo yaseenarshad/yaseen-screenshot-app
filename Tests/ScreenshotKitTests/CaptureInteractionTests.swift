@@ -20,14 +20,16 @@ import Testing
             windows: [CGDirectDisplayID: [CGRect]] = [:],
             styles: ToolStyleMemory = ToolStyleMemory(),
             toolbarKeys: ToolbarKeys = ToolbarKeys(defaults: MemoryDefaults()),
-            startTool: Tool? = nil
+            startTool: Tool? = nil,
+            clipboard: MarkClipboard = MarkClipboard()
         ) async throws {
             interaction = CaptureInteraction(
                 displays: try await FakeScreenCapture().freezeAllDisplays(),
                 windows: windows,
                 toolbarKeys: toolbarKeys,
                 startTool: startTool,
-                styles: styles
+                styles: styles,
+                clipboard: clipboard
             )
             interaction.onChange = { [unowned self] in self.changes += 1 }
             interaction.onFinish = { [unowned self] in self.outcomes.append($0) }
@@ -228,8 +230,10 @@ import Testing
     // MARK: Tools and marks (YAZ-2767)
 
     /// A harness with a box of 100 by 60 points on the retina screen: x 40 to 140, y 20 to 80.
-    private func harnessWithBox(styles: ToolStyleMemory = ToolStyleMemory()) async throws -> Harness {
-        let harness = try await Harness(styles: styles)
+    private func harnessWithBox(
+        styles: ToolStyleMemory = ToolStyleMemory(), clipboard: MarkClipboard = MarkClipboard()
+    ) async throws -> Harness {
+        let harness = try await Harness(styles: styles, clipboard: clipboard)
         harness.drag(from: CGPoint(x: 40, y: 20), to: CGPoint(x: 140, y: 80), on: retina)
         return harness
     }
@@ -662,8 +666,10 @@ import Testing
     /// The box of 100 by 60 points (x 40 to 140, y 20 to 80) with two Thick marks, and "Select" selected.
     /// Mark 0 is a rectangle, x 20 to 60 and y 10 to 40 of the box. Mark 1 is a pen line at y 50
     /// of the box, from x 10 to x 90. Near y 45 of the box, a click is near both lines.
-    private func harnessWithMarks(styles: ToolStyleMemory = ToolStyleMemory()) async throws -> Harness {
-        let harness = try await harnessWithBox(styles: styles)
+    private func harnessWithMarks(
+        styles: ToolStyleMemory = ToolStyleMemory(), clipboard: MarkClipboard = MarkClipboard()
+    ) async throws -> Harness {
+        let harness = try await harnessWithBox(styles: styles, clipboard: clipboard)
         let interaction = harness.interaction
         interaction.selectTool(.rectangle)
         harness.drag(from: CGPoint(x: 60, y: 30), to: CGPoint(x: 100, y: 60), on: retina)
@@ -1330,5 +1336,113 @@ import Testing
         interaction.pointerDown(at: CGPoint(x: 30, y: 20), on: retina)
         interaction.doubleClick(at: CGPoint(x: 30, y: 20), on: retina)
         #expect(harness.doneSelection?.rect == front)
+    }
+
+    // MARK: Copy, cut and paste (YAZ-3148)
+
+    // The rows are the scenarios on the working log YAZ-3150.
+
+    @Test func aPasteIsASelectedCopy16PointsFurtherAndACutIsOneUndoStep() async throws {
+        let harness = try await harnessWithMarks()
+        let interaction = harness.interaction
+        // Nothing was copied, and no mark is selected: nothing happens (rows 2 and 16).
+        interaction.key(.paste)
+        interaction.key(.copy)
+        interaction.key(.paste)
+        #expect(interaction.marks.marks.count == 2)
+
+        // A copy of the selected rectangle changes no mark and makes no Undo step (row 1).
+        harness.click(at: CGPoint(x: 80, y: 45), on: retina)
+        #expect(interaction.selectedIndex == 0)
+        let revision = interaction.marksRevision
+        interaction.key(.copy)
+        #expect(interaction.marks.marks.count == 2 && interaction.marksRevision == revision)
+
+        // A paste with a drawing tool on: the copy goes on top, 16 points to the right and down.
+        // It is selected, "Select" is on, and the tool is off (rows 10 and 14).
+        interaction.selectTool(.arrow)
+        interaction.key(.paste)
+        #expect(interaction.marks.marks.map(\.tool) == [.rectangle, .pen, .rectangle])
+        #expect(interaction.marks.marks[2].points == [CGPoint(x: 36, y: 26), CGPoint(x: 76, y: 56)])
+        #expect(interaction.selectedIndex == 2 && interaction.isSelecting && interaction.tool == nil)
+        #expect(interaction.style == interaction.marks.marks[0].style)
+
+        // A drag right after the paste moves the copy (row 15).
+        harness.drag(from: CGPoint(x: 106, y: 68), to: CGPoint(x: 100, y: 62), on: retina)
+        #expect(interaction.marks.marks[2].points == [CGPoint(x: 30, y: 20), CGPoint(x: 70, y: 50)])
+
+        // Undo takes back the move, then the paste. No mark is selected. Redo brings the copy back (row 27).
+        interaction.key(.undo)
+        interaction.key(.undo)
+        #expect(interaction.marks.marks.map(\.tool) == [.rectangle, .pen] && interaction.selectedIndex == nil)
+        interaction.key(.redo)
+        #expect(interaction.marks.marks.count == 3 && interaction.selectedIndex == nil)
+
+        // A cut of the pen line is one Undo step. The first paste after it is at the same place (rows 7 and 12).
+        harness.click(at: CGPoint(x: 60, y: 70), on: retina)
+        #expect(interaction.selectedIndex == 1)
+        let pen = interaction.marks.marks[1]
+        interaction.key(.cut)
+        #expect(interaction.marks.marks.map(\.tool) == [.rectangle, .rectangle] && interaction.selectedIndex == nil)
+        interaction.key(.paste)
+        #expect(interaction.marks.marks.last == pen && interaction.selectedIndex == 2)
+        interaction.key(.undo)
+        interaction.key(.undo)
+        #expect(interaction.marks.marks.count == 3 && interaction.marks.marks[1] == pen)
+    }
+
+    @Test func copyCutAndPasteDoNothingWithNoBoxDuringADragOrWhileATextIsOpen() async throws {
+        let clipboard = MarkClipboard()
+        clipboard.copy(Mark(tool: .number, style: .initial(for: .number), points: [CGPoint(x: 30, y: 30)], number: 3))
+        let harness = try await Harness(clipboard: clipboard)
+        let interaction = harness.interaction
+        // No box exists yet (row 17).
+        interaction.key(.paste)
+        #expect(interaction.marks.isEmpty && interaction.selection(on: retina) == nil)
+
+        // The first mark of the capture is a paste: the box is fixed and has no handles (row 22).
+        // The copy of number 3 is 3, and the Number tool then gives 4 (row 25).
+        harness.drag(from: CGPoint(x: 40, y: 20), to: CGPoint(x: 140, y: 80), on: retina)
+        #expect(interaction.showsHandles)
+        interaction.key(.paste)
+        #expect(interaction.marks.marks.map(\.number) == [3] && !interaction.showsHandles)
+        interaction.selectTool(.number)
+        harness.click(at: CGPoint(x: 120, y: 40), on: retina)
+        #expect(interaction.marks.marks.map(\.number) == [3, 4])
+
+        // During a drag of number 4, the keys do nothing (rows 5 and 19). The clipboard still has number 3.
+        interaction.toggleSelecting()
+        interaction.pointerDown(at: CGPoint(x: 120, y: 40), on: retina)
+        interaction.pointerDragged(to: CGPoint(x: 115, y: 45))
+        interaction.key(.copy)
+        interaction.key(.cut)
+        interaction.key(.paste)
+        interaction.pointerUp(at: CGPoint(x: 115, y: 45))
+        #expect(interaction.marks.marks.map(\.number) == [3, 4])
+        interaction.key(.paste)
+        #expect(interaction.marks.marks.map(\.number) == [3, 4, 3])
+
+        // While a text is open, a paste adds no mark (row 18). The view gives the keys to the field.
+        interaction.selectTool(.text)
+        harness.click(at: CGPoint(x: 60, y: 70), on: retina)
+        interaction.key(.paste)
+        #expect(interaction.textEdit != nil && interaction.marks.marks.count == 3)
+    }
+
+    @Test func aMarkThatWasCopiedInOneCapturePastesIntoTheNext() async throws {
+        let clipboard = MarkClipboard()
+        let first = try await harnessWithMarks(clipboard: clipboard)
+        first.click(at: CGPoint(x: 80, y: 45), on: retina)
+        first.interaction.key(.copy)
+        first.interaction.key(.enter)
+        #expect(first.doneResult != nil)
+
+        // Done does not clear the clipboard (row 24). The next box is 40 by 30 points: smaller than the
+        // rectangle with its line, so the copy keeps its top-left corner in the box (row 23).
+        let second = try await Harness(clipboard: clipboard)
+        second.drag(from: CGPoint(x: 10, y: 10), to: CGPoint(x: 50, y: 40), on: retina)
+        second.interaction.key(.paste)
+        let pasted = try #require(second.interaction.marks.marks.first)
+        #expect(pasted.tool == .rectangle && pasted.bounds.origin == .zero)
     }
 }

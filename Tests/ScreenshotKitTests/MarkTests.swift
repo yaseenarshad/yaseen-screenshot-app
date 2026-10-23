@@ -733,3 +733,61 @@ import Testing
         }
     }
 }
+
+/// The clipboard of marks (YAZ-3148): a copy, a cut, and where each paste goes. The rows are the
+/// scenarios on the working log YAZ-3150.
+@Suite struct MarkClipboardTests {
+    let box = CGSize(width: 200, height: 100)
+    /// A Thick rectangle (a line of 7 points): x 10 to 30, y 10 to 20 of the box.
+    let rectangle = Mark(
+        tool: .rectangle, style: MarkStyle(color: .red, size: .thick), points: [CGPoint(x: 10, y: 10), CGPoint(x: 30, y: 20)]
+    )
+
+    @Test func eachPasteAfterACopyIs16PointsFurtherAndTheFirstPasteAfterACutIsAtTheSamePlace() {
+        let clipboard = MarkClipboard()
+        #expect(clipboard.nextPaste(in: box) == nil) // nothing was copied (row 16)
+
+        clipboard.copy(rectangle)
+        let pastes = (0..<3).compactMap { _ in clipboard.nextPaste(in: box) }
+        #expect(pastes.map(\.frame.origin) == [CGPoint(x: 26, y: 26), CGPoint(x: 42, y: 42), CGPoint(x: 58, y: 58)]) // rows 10, 11
+        #expect(pastes.allSatisfy { $0.frame.size == rectangle.frame.size && $0.style == rectangle.style })
+
+        clipboard.cut(rectangle)
+        #expect(clipboard.nextPaste(in: box) == rectangle) // row 12
+        #expect(clipboard.nextPaste(in: box)?.frame.origin == CGPoint(x: 26, y: 26))
+    }
+
+    @Test func aPasteStaysInTheBoxAndANumberKeepsItsNumber() throws {
+        let clipboard = MarkClipboard()
+        // Near the bottom-right corner, the paste stops at the edges, and the next paste stacks on it (row 13).
+        clipboard.copy(Mark(tool: .rectangle, style: rectangle.style, points: [CGPoint(x: 170, y: 80), CGPoint(x: 190, y: 90)]))
+        let atTheEdge = try #require(clipboard.nextPaste(in: box))
+        #expect(atTheEdge.bounds.maxX == 200 && atTheEdge.bounds.maxY == 100)
+        #expect(clipboard.nextPaste(in: box) == atTheEdge)
+
+        // A smaller box, as in the next capture (row 23): the copy moves in. A mark that is larger
+        // than the box keeps its top-left corner in the box.
+        clipboard.copy(Mark(tool: .rectangle, style: rectangle.style, points: [CGPoint(x: 150, y: 70), CGPoint(x: 190, y: 90)]))
+        let small = CGSize(width: 60, height: 40)
+        #expect(clipboard.nextPaste(in: small).map { CGRect(origin: .zero, size: small).contains($0.bounds) } == true)
+        clipboard.copy(Mark(tool: .rectangle, style: rectangle.style, points: [CGPoint(x: 100, y: 40), CGPoint(x: 190, y: 90)]))
+        #expect(clipboard.nextPaste(in: small)?.bounds.origin == .zero)
+
+        // A copy of number 3 is number 3 (D4, row 25).
+        clipboard.copy(Mark(tool: .number, style: .initial(for: .number), points: [CGPoint(x: 50, y: 50)], number: 3))
+        #expect(clipboard.nextPaste(in: box)?.number == 3)
+    }
+
+    /// A Text mark keeps its text and its style. In a smaller box, its lines break at the right
+    /// edge of that box (row 26, row 23). A Text mark measures its text, so the test runs on the main actor.
+    @MainActor @Test func aTextKeepsItsTextAndBreaksAtTheRightEdgeOfTheNewBox() {
+        let clipboard = MarkClipboard()
+        let text = Mark(
+            tool: .text, style: MarkStyle(color: .blue, size: .medium), points: [CGPoint(x: 10, y: 10)], text: "tabs", wrapWidth: 190
+        )
+        clipboard.copy(text)
+        let pasted = clipboard.nextPaste(in: CGSize(width: 120, height: 80))
+        #expect(pasted?.text == "tabs" && pasted?.style == text.style)
+        #expect(pasted?.points == [CGPoint(x: 26, y: 26)] && pasted?.wrapWidth == 120 - 26)
+    }
+}
