@@ -800,6 +800,38 @@ import Testing
         #expect(up.style.fontSize == 72 && up.points[0].x == 100 && up.points[0].y < 260 && up.bounds.maxY <= box.height)
     }
 
+    /// YAZ-3338 (the checker of PR 12): a top-left or bottom-left corner drag that brings a text to
+    /// the left edge of the box. Up to the edge, the corner that stays does not move. At the edge,
+    /// the text stops at x 0 and grows to the right (D4). It never jumps.
+    @Test func aLeftCornerDragToTheLeftEdgeStopsAtTheEdgeAndDoesNotJump() {
+        let box = CGSize(width: 400, height: 300)
+        let words = Mark(
+            tool: .text, style: MarkStyle(color: .red, size: .thick), points: [CGPoint(x: 60, y: 200)],
+            text: "Hello world", wrapWidth: 340
+        )
+        let outline = words.outline
+        var lastFont: CGFloat = 0
+        for scale in [CGFloat(1.2), 1.45, 1.5, 1.55, 1.6, 2] {
+            let pointer = CGPoint(x: outline.maxX - outline.width * scale, y: outline.maxY - outline.height * scale)
+            let scaled = words.resized(.frame(.topLeft), to: pointer, in: box)
+            // The bottom stays, at each scale.
+            #expect(abs(scaled.bounds.maxY - words.bounds.maxY) < 1, "\(scale)")
+            #expect(scaled.style.fontSize > lastFont, "\(scale)")
+            lastFont = scaled.style.fontSize
+            if scaled.points[0].x > 0 {
+                // Room on the left: the right edge stays too.
+                #expect(scaled.bounds.maxX <= words.bounds.maxX && scaled.bounds.maxX > words.bounds.maxX - 1, "\(scale)")
+            } else {
+                // At the left edge: the text grows to the right, on one line, in the box.
+                #expect(scaled.bounds.maxX >= words.bounds.maxX && scaled.bounds.maxX <= box.width, "\(scale)")
+            }
+            let bottomLeft = words.resized(.frame(.bottomLeft), to: CGPoint(x: pointer.x, y: outline.minY + outline.height * scale), in: box)
+            #expect(bottomLeft.bounds.minY == words.bounds.minY && bottomLeft.points[0].x >= 0, "\(scale)")
+        }
+        // The last scales reach the left edge.
+        #expect(words.resized(.frame(.topLeft), to: CGPoint(x: -100, y: 0), in: box).points[0].x == 0)
+    }
+
     /// YAZ-3318 D1: a size sets the font of a Text again, also after a free font.
     @Test func aSizeSetsTheFontAgainAfterAFreeFont() {
         var style = MarkStyle(color: .red, size: .thin)

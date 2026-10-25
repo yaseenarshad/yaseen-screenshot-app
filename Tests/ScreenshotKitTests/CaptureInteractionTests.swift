@@ -1292,6 +1292,13 @@ import Testing
         let forty = interaction.marks.marks[0]
         let handle = try #require(forty.handles.first { $0.key == .frame(.bottomRight) })
         let outline = forty.outline
+        // The pointer shows the resize arrow of each corner, and the open hand on the text (S12).
+        for corner in forty.handles {
+            let onCorner = CGPoint(x: boxOrigin.x + corner.point.x, y: boxOrigin.y + corner.point.y)
+            guard case .frame(let key) = corner.key else { continue }
+            #expect(interaction.pointerShape(at: onCorner, on: retina) == .resize(key))
+        }
+        #expect(interaction.pointerShape(at: CGPoint(x: boxOrigin.x + outline.midX, y: boxOrigin.y + outline.midY), on: retina) == .openHand)
         let middle = CGPoint(x: (outline.minX + handle.point.x) / 2, y: (outline.minY + handle.point.y) / 2)
         harness.drag(
             from: CGPoint(x: boxOrigin.x + handle.point.x, y: boxOrigin.y + handle.point.y),

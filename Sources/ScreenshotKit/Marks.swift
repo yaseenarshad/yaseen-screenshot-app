@@ -415,15 +415,18 @@ extension Mark {
         let fonts = MarkStyle.fontSizes
         scaled.style.fontSize = min(max((style.fontSize * scale).rounded(), fonts.lowerBound), fonts.upperBound)
         // The text grows from the corner that stays. Its lines start at its origin (the text has
-        // no padding), so the bounds start there too. A text that grows to the left can use the
-        // width up to the corner that stays; a text that grows to the right, up to the edge of the box.
-        let widthForLines = corner.horizontal < 0 ? bounds.maxX : size.width - bounds.minX
+        // no padding), so the bounds start there too. The lines of a saved text break at the right
+        // edge of the box. A text that grows to the left can start at the left edge, so its layout
+        // gets the full width of the box: then the lines are the lines that the text gets at its
+        // place. Where the room ends, the text stops at the left edge and grows to the right (D4).
+        let widthForLines = corner.horizontal < 0 ? size.width : size.width - bounds.minX
         let used = TextLayout(text: text, style: scaled.style, wrapWidth: widthForLines).usedRect.size
         // Whole points, as a new text. Down, so the corner that stays is never passed.
-        let x = corner.horizontal < 0 ? (bounds.maxX - used.width).rounded(.down) : bounds.minX
+        let x = corner.horizontal < 0 ? max((bounds.maxX - used.width).rounded(.down), 0) : bounds.minX
         let y = corner.vertical < 0 ? (bounds.maxY - used.height).rounded(.down) : bounds.minY
         scaled.points = [CGPoint(x: x, y: y)]
-        scaled.wrapWidth = size.width - max(x, 0)
+        // `moved` measures the text with this width, before it sets the same width again.
+        scaled.wrapWidth = size.width - x
         // The lines break at the right edge of the box, and a text that is too tall moves up, as
         // after a size change (D4).
         return scaled.moved(by: .zero, in: size)
