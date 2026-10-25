@@ -19,6 +19,8 @@ enum ScreenRecordingPermission {
     /// starts: `CGPreflightScreenCaptureAccess` keeps its first answer. Returns `false` when the
     /// app cannot open itself again; then it does not quit.
     static func relaunch() -> Bool {
+        // Only an app bundle can open again. A bare binary (`swift run`) would open its folder.
+        guard Bundle.main.bundleURL.pathExtension == "app" else { return false }
         let shell = Process()
         shell.executableURL = URL(fileURLWithPath: "/bin/sh")
         // The new app starts after this one is gone, so it can take the hotkey.

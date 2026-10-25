@@ -830,6 +830,25 @@ import Testing
         }
         // The last scales reach the left edge.
         #expect(words.resized(.frame(.topLeft), to: CGPoint(x: -100, y: 0), in: box).points[0].x == 0)
+
+        // A top corner drag past the top edge: the text stops at y 0 and grows down. It never jumps.
+        let high = Mark(
+            tool: .text, style: MarkStyle(color: .red, size: .thick), points: [CGPoint(x: 100, y: 20)],
+            text: "Hi", wrapWidth: 300
+        )
+        let highOutline = high.outline
+        var lastBottom = high.bounds.maxY
+        for scale in [CGFloat(1.2), 1.5, 2, 3] {
+            let pointer = CGPoint(x: highOutline.minX, y: highOutline.maxY - highOutline.height * scale)
+            let scaled = high.resized(.frame(.topRight), to: pointer, in: box)
+            #expect(scaled.points[0].y >= 0 && scaled.bounds.minX == high.bounds.minX, "\(scale)")
+            if scaled.points[0].y > 0 {
+                #expect(abs(scaled.bounds.maxY - high.bounds.maxY) < 1, "\(scale)")
+            } else {
+                #expect(scaled.bounds.maxY >= lastBottom, "\(scale)")
+            }
+            lastBottom = scaled.bounds.maxY
+        }
     }
 
     /// YAZ-3318 D1: a size sets the font of a Text again, also after a free font.
