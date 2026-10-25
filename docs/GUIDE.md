@@ -38,8 +38,8 @@ Esc or Cancel stops the capture. Nothing is copied and nothing is saved. Esc fir
 
 ### The toolbar
 
-- **Select:** click a mark to select it. Drag it to move it. Drag a handle to change a rectangle, an ellipse or an arrow. Delete removes it. A double-click on a text opens the text again. Command-C copies it, Command-X cuts it, and Command-V pastes a copy 16 points to the right and down. After a cut, the first paste goes to the same place. The copy stays until you copy or cut a different mark, or quit the app.
-- **Rectangle, Ellipse, Arrow, Pen, Highlight, Text:** drag in the box to draw. For Text, click, type, and press Return.
+- **Select:** click a mark to select it. Drag it to move it. Drag a handle to change a rectangle, an ellipse or an arrow. Drag a corner of a text to make it bigger or smaller. Delete removes it. A double-click on a text opens the text again. Command-C copies it, Command-X cuts it, and Command-V pastes a copy 16 points to the right and down. After a cut, the first paste goes to the same place. The copy stays until you copy or cut a different mark, or quit the app.
+- **Rectangle, Ellipse, Arrow, Pen, Highlight, Text:** drag in the box to draw. For Text, click, type, and press Return. Return selects the text, so you can size it or move it at once. Press T for the next text.
 - **Number:** click in the box to put a numbered circle: 1, 2, 3. The next number is the highest number in the box, plus 1.
 - **Sizes and colours:** Thin, Medium and Thick, and six colours. They show when a tool or a mark is selected, and they change the selected mark. Each tool starts with Thick and red. Highlight starts with amber.
 - **Undo:** the button or Command-Z. Shift-Command-Z puts the change back.
@@ -62,6 +62,7 @@ One key selects a tool, a size or a colour. Thus you can drag the box, press A, 
 | N | Number |
 | 1, 2, 3 | Thin, Medium, Thick |
 | 4 to 9 | Red, Amber, Green, Blue, Black, White |
+| 1 to 9, 0 (a text is selected) | Font size 12, 16, 20, 24, 32, 40, 56, 72, 96, 128 |
 
 - The keys are the keys of Yaseen Screendraw.
 - A tool key always selects its tool. A second press keeps it. A click on the selected tool still clears it.
