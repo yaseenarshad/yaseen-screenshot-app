@@ -10,7 +10,7 @@ How to install and use Yaseen Screenshot, with each detail. The short version is
 4. Start the app from `/Applications`. macOS stops it the first time, because the app is not notarized.
 5. Open System Settings, then Privacy & Security. Click "Open Anyway" next to "Yaseen Screenshot". You do this one time.
 6. The app asks for the Screen Recording permission. Open System Settings, Privacy & Security, Screen & System Audio Recording. Turn on "Yaseen Screenshot".
-7. If macOS asks, quit the app and open it again. Then press Shift-Command-D.
+7. Click **Quit and Reopen** in the window of the app. macOS gives the app the permission only when the app starts again. Then press Shift-Command-D.
 
 ### If you do not see the menu bar icon
 
@@ -22,7 +22,9 @@ A MacBook with a notch hides the icons that do not fit. A full menu bar can put 
 
 ### If macOS asks for the permission again after an update
 
-The download from GitHub has a simple signature. Thus macOS sees an update as a new app, and asks for the Screen Recording permission again. Turn it on again.
+The download from GitHub has a simple signature. Thus macOS sees an update as a new app, and asks for the Screen Recording permission again. Turn it on again, then click **Quit and Reopen**.
+
+If the switch in System Settings is on and the app still asks, click **Quit and Reopen** too. The app reads the permission only when it starts.
 
 If you build the app yourself with a fixed certificate, macOS asks one time only. The [developer page](DEVELOPMENT.md) tells how.
 
