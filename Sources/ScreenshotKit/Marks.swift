@@ -58,7 +58,7 @@ public enum MarkColor: Hashable, CaseIterable {
     }
 }
 
-/// The colour and the size of a mark.
+/// The colour and the size of a mark, and the font of a Text mark.
 public struct MarkStyle: Equatable {
     public var color: MarkColor
     /// A new size also sets the font of a Text mark (YAZ-2782 row 18).
@@ -159,7 +159,8 @@ public struct Mark: Equatable {
 
 /// A handle of the selected mark.
 public enum MarkHandle: Hashable {
-    /// Rectangle and Ellipse: one of the eight handles of the rectangle of the mark.
+    /// Rectangle and Ellipse: one of the eight handles of the rectangle of the mark. Text: one of
+    /// the four corners of its outline (YAZ-3318).
     case frame(Handle)
     /// Arrow: the start (0) or the end with the head (1).
     case end(Int)
@@ -396,8 +397,10 @@ extension Mark {
     /// (YAZ-3318). The font grows or shrinks, and the opposite corner stays. The scale is how far
     /// the pointer is along the diagonal of the outline: 1 at the corner where the drag started.
     private func scaledText(by corner: Handle, to point: CGPoint, in size: CGSize) -> Mark {
-        let outline = self.outline, bounds = self.bounds
-        guard let origin = points.first, style.fontSize > 0 else { return self }
+        // One layout for the bounds and the outline: a drag calls this for each pointer event.
+        let bounds = self.bounds
+        let outline = bounds.insetBy(dx: -Mark.outlineGap, dy: -Mark.outlineGap)
+        guard style.fontSize > 0 else { return self }
         let fixed = CGPoint(
             x: corner.horizontal < 0 ? outline.maxX : outline.minX,
             y: corner.vertical < 0 ? outline.maxY : outline.minY
@@ -411,12 +414,14 @@ extension Mark {
         var scaled = self
         let fonts = MarkStyle.fontSizes
         scaled.style.fontSize = min(max((style.fontSize * scale).rounded(), fonts.lowerBound), fonts.upperBound)
-        // The text grows from the corner that stays. `lead` is the space from the origin of the
-        // text to its first letter, and it grows with the font too.
-        let ratio = scaled.style.fontSize / style.fontSize
-        let lead = CGPoint(x: bounds.minX - origin.x, y: bounds.minY - origin.y)
-        let x = (corner.horizontal < 0 ? bounds.maxX - bounds.width * ratio : bounds.minX) - lead.x * ratio
-        let y = (corner.vertical < 0 ? bounds.maxY - bounds.height * ratio : bounds.minY) - lead.y * ratio
+        // The text grows from the corner that stays. Its lines start at its origin (the text has
+        // no padding), so the bounds start there too. A text that grows to the left can use the
+        // width up to the corner that stays; a text that grows to the right, up to the edge of the box.
+        let widthForLines = corner.horizontal < 0 ? bounds.maxX : size.width - bounds.minX
+        let used = TextLayout(text: text, style: scaled.style, wrapWidth: widthForLines).usedRect.size
+        // Whole points, as a new text. Down, so the corner that stays is never passed.
+        let x = corner.horizontal < 0 ? (bounds.maxX - used.width).rounded(.down) : bounds.minX
+        let y = corner.vertical < 0 ? (bounds.maxY - used.height).rounded(.down) : bounds.minY
         scaled.points = [CGPoint(x: x, y: y)]
         scaled.wrapWidth = size.width - max(x, 0)
         // The lines break at the right edge of the box, and a text that is too tall moves up, as

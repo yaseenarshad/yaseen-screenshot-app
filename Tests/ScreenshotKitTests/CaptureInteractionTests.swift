@@ -1262,13 +1262,13 @@ import Testing
         // Return on an empty text adds no mark, and the Text tool stays on (S32).
         interaction.selectTool(.text)
         harness.click(at: CGPoint(x: 45, y: 35), on: retina)
-        interaction.returnInText()
+        interaction.completeText(selectsNewText: true)
         #expect(interaction.marks.isEmpty && interaction.tool == .text && interaction.selectedIndex == nil)
 
         // Return completes a new text and selects it, with "Select" on and the Text tool off (S31).
         harness.click(at: CGPoint(x: 45, y: 35), on: retina)
         interaction.textChanged("Hi")
-        interaction.returnInText()
+        interaction.completeText(selectsNewText: true)
         let hi = try #require(interaction.marks.marks.first)
         #expect(hi.points == [CGPoint(x: 5, y: 0)] && hi.style.fontSize == 24)
         #expect(interaction.selectedIndex == 0 && interaction.isSelecting && interaction.tool == nil)
@@ -1319,6 +1319,64 @@ import Testing
         harness.click(at: CGPoint(x: 60, y: 60), on: retina)
         #expect(interaction.marks.marks.count == 2 && interaction.selectedIndex == nil && interaction.tool == .text)
         #expect(interaction.marks.marks[1].style.fontSize == 18)
+    }
+
+    /// YAZ-3318: a digit on a mark that is not text keeps its old action (S3). A digit that Settings
+    /// gave to an action still sets the font of a selected text (S9). A corner drag changes only
+    /// the font of the next text, not its colour (D5). A text that was opened again stays selected
+    /// after Return (S36).
+    @MainActor @Test func aDigitOnADifferentMarkAKeyFromSettingsAndAReopenedText() async throws {
+        let defaults = MemoryDefaults()
+        defaults.set(["select": "1", "size.thin": "v"], forKey: "toolbarKeys")
+        let styles = ToolStyleMemory()
+        let harness = try await Harness(styles: styles, toolbarKeys: ToolbarKeys(defaults: defaults))
+        let interaction = harness.interaction
+        harness.drag(from: CGPoint(x: 40, y: 20), to: CGPoint(x: 140, y: 80), on: retina)
+        interaction.selectTool(.rectangle)
+        harness.drag(from: CGPoint(x: 60, y: 30), to: CGPoint(x: 100, y: 60), on: retina)
+        interaction.selectTool(.text)
+        harness.click(at: CGPoint(x: 115, y: 40), on: retina)
+        interaction.textChanged("Hi")
+        interaction.completeText(selectsNewText: true)
+        #expect(interaction.selectedIndex == 1 && interaction.marks.marks[1].points == [CGPoint(x: 52, y: 5)])
+
+        // S9: 1 is the key of Select now, but with a text selected it gives 12 points.
+        interaction.toolbarKey("1")
+        #expect(interaction.marks.marks[1].style.fontSize == 12 && interaction.isSelecting)
+
+        // S3: with the rectangle selected, 2 is Medium and 7 is Blue, as before.
+        harness.click(at: CGPoint(x: 60, y: 45), on: retina)
+        #expect(interaction.selectedIndex == 0)
+        interaction.toolbarKey("2")
+        interaction.toolbarKey("7")
+        #expect(interaction.marks.marks[0].style == MarkStyle(color: .blue, size: .medium))
+
+        // D5: the next text is green. A corner drag of the red text changes only the font of the next text.
+        interaction.selectTool(.text)
+        interaction.toolbarKey("6")
+        #expect(styles[.text].color == .green && styles[.text].fontSize == 12)
+        interaction.toggleSelecting()
+        harness.click(at: CGPoint(x: 95, y: 30), on: retina)
+        let small = try #require(interaction.selectedMark)
+        #expect(small.tool == .text)
+        let outline = small.outline
+        let far = CGPoint(x: outline.minX + outline.width * 2, y: outline.minY + outline.height * 2)
+        harness.drag(
+            from: CGPoint(x: 40 + outline.maxX, y: 20 + outline.maxY), to: CGPoint(x: 40 + far.x, y: 20 + far.y), on: retina
+        )
+        #expect(interaction.marks.marks[1].style.fontSize == 24 && interaction.marks.marks[1].style.color == .red)
+        #expect(styles[.text].color == .green && styles[.text].fontSize == 24)
+
+        // S36: a double-click opens the text again. Return completes it, and it stays selected.
+        let onText = CGPoint(x: 100, y: 35)
+        harness.click(at: onText, on: retina)
+        interaction.pointerDown(at: onText, on: retina)
+        interaction.doubleClick(at: onText, on: retina)
+        interaction.pointerUp(at: onText)
+        #expect(interaction.textEdit?.index == 1)
+        interaction.textChanged("Hi there")
+        interaction.completeText(selectsNewText: true)
+        #expect(interaction.selectedIndex == 1 && interaction.isSelecting && interaction.marks.marks[1].text == "Hi there")
     }
 
     // MARK: The click on a window (YAZ-2769)

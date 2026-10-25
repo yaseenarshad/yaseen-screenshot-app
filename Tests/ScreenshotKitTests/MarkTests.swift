@@ -761,10 +761,29 @@ import Testing
         let larger = hi.resized(.frame(.bottomRight), to: pointer(hi, .bottomRight, 2), in: box)
         #expect(larger.style.fontSize == 48 && larger.points == hi.points && larger.style.color == .red)
         #expect(larger.wrapWidth == box.width - larger.points[0].x)
-        // The top-left corner, two times as far: the bottom-right stays, to a point (S14).
-        let fromTopLeft = hi.resized(.frame(.topLeft), to: pointer(hi, .topLeft, 2), in: box)
-        #expect(fromTopLeft.style.fontSize == 48)
-        #expect(abs(fromTopLeft.bounds.maxX - hi.bounds.maxX) <= 1 && abs(fromTopLeft.bounds.maxY - hi.bounds.maxY) <= 1)
+        // A left or a top corner: the opposite corner stays, to less than a point, and the text
+        // stays on whole points (S14). A longer text shows a drift that a short text hides.
+        // A larger box, so the text does not reach an edge.
+        let wide = CGSize(width: 800, height: 600)
+        let words = Mark(
+            tool: .text, style: MarkStyle(color: .red, size: .thick), points: [point(300, 250)], text: "Hello world", wrapWidth: 500
+        )
+        for (corner, scale) in [(Handle.topLeft, CGFloat(3)), (.topLeft, 0.5), (.bottomLeft, 3), (.topRight, 0.5)] {
+            let scaled = words.resized(.frame(corner), to: pointer(words, corner, scale), in: wide)
+            #expect(scaled.style.fontSize == (24 * scale).rounded(), "\(corner) \(scale)")
+            let origin = scaled.points[0]
+            #expect(origin.x == origin.x.rounded() && origin.y == origin.y.rounded(), "\(corner) \(scale)")
+            if corner.horizontal < 0 {
+                #expect(scaled.bounds.maxX <= words.bounds.maxX && scaled.bounds.maxX > words.bounds.maxX - 1, "\(corner) \(scale)")
+            } else {
+                #expect(scaled.bounds.minX == words.bounds.minX, "\(corner) \(scale)")
+            }
+            if corner.vertical < 0 {
+                #expect(scaled.bounds.maxY <= words.bounds.maxY && scaled.bounds.maxY > words.bounds.maxY - 1, "\(corner) \(scale)")
+            } else {
+                #expect(scaled.bounds.minY == words.bounds.minY, "\(corner) \(scale)")
+            }
+        }
         // Half as far: 12 points (S15). Past the opposite corner, and very far: 8 and 256 (S16, S17).
         #expect(hi.resized(.frame(.topRight), to: pointer(hi, .topRight, 0.5), in: box).style.fontSize == 12)
         #expect(hi.resized(.frame(.bottomLeft), to: pointer(hi, .bottomLeft, -3), in: box).style.fontSize == 8)
@@ -789,7 +808,6 @@ import Testing
         #expect(style != MarkStyle(color: .red, size: .thin))
         style.size = .medium
         #expect(style == MarkStyle(color: .red, size: .medium) && style.fontSize == 18)
-        #expect(MarkStyle.digitFontSizes.count == 10 && MarkStyle.digitFontSizes["0"] == 128)
     }
 }
 

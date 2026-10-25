@@ -735,7 +735,10 @@ extension Toolbar {
         #expect(thick.isOn)
         // A digit gives 32 points (D2). No size has 32 points, so no size is on (D7).
         interaction.toolbarKey("5")
-        #expect(interaction.marks.marks[1].style.fontSize == 32 && !thick.isOn)
+        #expect(interaction.marks.marks[1].style.fontSize == 32)
+        for size in ["Thin", "Medium", "Thick"] {
+            #expect((toolbar.button(named: size) as? ToolbarButton)?.isOn == false, "\(size)")
+        }
         interaction.undo()
 
         // "Select" with no selected mark: the second row does not show (row 3), and the box in the

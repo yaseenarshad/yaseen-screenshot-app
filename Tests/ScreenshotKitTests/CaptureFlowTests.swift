@@ -547,7 +547,7 @@ private final class CountingSound: SoundPlaying {
         interaction.pointerUp(at: CGPoint(x: 20, y: 25))
         interaction.textChanged("Hi")
         // Return selects the text, and 6 makes it 40 points.
-        interaction.returnInText()
+        interaction.completeText(selectsNewText: true)
         interaction.toolbarKey("6")
         // A drag of the bottom-right corner, 1.5 times as far from the top-left corner: 60 points.
         let forty = try #require(interaction.selectedMark)

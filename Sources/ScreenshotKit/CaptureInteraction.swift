@@ -369,7 +369,7 @@ public final class CaptureInteraction {
                     marks.add(draft.mark)
                 }
                 // A corner drag of a text sets the font of the next text too, as a digit does (YAZ-3318).
-                if case .resizeMark = drag, draft.mark.tool == .text { styles[.text] = draft.mark.style }
+                if case .resizeMark = drag, draft.mark.tool == .text { styles[.text].fontSize = draft.mark.style.fontSize }
                 marksChanged()
             }
         case .move, .resize:
@@ -475,9 +475,9 @@ public final class CaptureInteraction {
         onChange?()
     }
 
-    /// A toolbar key (D2, YAZ-2872): it does the same as a click on its button, with one difference.
+    /// A toolbar key (D2, YAZ-2872): it does the same as a click on its button, with two differences.
     /// A tool key always selects its tool. A second press does not clear it, so the next drag
-    /// never moves the box by mistake.
+    /// never moves the box by mistake. And with a Text mark selected, a digit sets its font (YAZ-3318).
     ///
     /// A key with no box or during a drag does nothing: the mark in progress keeps its tool and
     /// its style. While a text is open, the text field has the keyboard and each key is for the typing.
@@ -646,7 +646,9 @@ public final class CaptureInteraction {
 
     /// Return, or a click in a different place: the open text becomes a mark. An empty text adds
     /// no mark. For a text that was open again, the mark changes, and an empty text removes it.
-    public func completeText() {
+    /// Return gives `selectsNewText`: a new text is then the selected mark, with "Select" on
+    /// (YAZ-3318). Thus a digit, a corner drag or a move works at once. T starts the next text.
+    public func completeText(selectsNewText: Bool = false) {
         guard !isFinished, let edit = textEdit else { return }
         textEdit = nil
         let mark = Mark(tool: .text, style: edit.style, points: [edit.origin], text: edit.text, wrapWidth: edit.wrapWidth)
@@ -663,20 +665,12 @@ public final class CaptureInteraction {
         } else if !isEmpty {
             marks.add(mark)
             marksRevision += 1
+            if selectsNewText {
+                tool = nil
+                isSelecting = true
+                selectedIndex = marks.marks.count - 1
+            }
         }
-        onChange?()
-    }
-
-    /// Return: the open text becomes a mark, as `completeText` does. A new text is then the
-    /// selected mark, with "Select" on (YAZ-3318). Thus a digit, a corner drag or a move works at
-    /// once. T, or a click on Text, starts the next text.
-    public func returnInText() {
-        guard !isFinished, let edit = textEdit else { return }
-        completeText()
-        guard edit.index == nil, !edit.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        tool = nil
-        isSelecting = true
-        selectedIndex = marks.marks.count - 1
         onChange?()
     }
 

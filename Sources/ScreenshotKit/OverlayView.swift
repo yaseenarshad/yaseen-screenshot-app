@@ -317,7 +317,7 @@ final class OverlayView: NSView, NSTextViewDelegate {
         switch commandSelector {
         case #selector(NSResponder.insertNewline(_:)):
             // Return completes the text and selects it. Option-Return still makes a new line.
-            interaction.returnInText()
+            interaction.completeText(selectsNewText: true)
             return true
         case #selector(NSResponder.cancelOperation(_:)):
             interaction.key(.escape)
