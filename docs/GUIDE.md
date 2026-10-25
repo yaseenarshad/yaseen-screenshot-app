@@ -66,7 +66,7 @@ One key selects a tool, a size or a colour. Thus you can drag the box, press A, 
 | 4 to 9 | Red, Amber, Green, Blue, Black, White |
 | 1 to 9, 0 (a text is selected) | Font size 14, 20, 28, 40, 56, 80, 112, 160, 220, 256 |
 
-- The keys are the keys of Yaseen Screendraw. The font keys of a text work as in Yaseen Draw, with larger steps: each key is about 1.4 times the key before.
+- The keys are the keys of Yaseen Screendraw. The font keys of a text work as in Yaseen Draw, with larger steps: from 1 to 9, each key is about 1.4 times the key before. 0 is the largest font.
 - While a text is selected, the digits set its font, also a digit that you gave to a different action in the settings. Thus, after Return, 7 gives 112 points, not blue. To change the colour of a selected text, click the colour.
 - A tool key always selects its tool. A second press keeps it. A click on the selected tool still clears it.
 - A key works after the box exists. It does nothing during a drag. While you type a text, each key is for the text.

@@ -839,7 +839,10 @@ import Testing
         let highOutline = high.outline
         var lastBottom = high.bounds.maxY
         for scale in [CGFloat(1.2), 1.5, 2, 3] {
-            let pointer = CGPoint(x: highOutline.minX, y: highOutline.maxY - highOutline.height * scale)
+            // Along the diagonal, from the bottom-left corner that stays.
+            let pointer = CGPoint(
+                x: highOutline.minX + highOutline.width * scale, y: highOutline.maxY - highOutline.height * scale
+            )
             let scaled = high.resized(.frame(.topRight), to: pointer, in: box)
             #expect(scaled.points[0].y >= 0 && scaled.bounds.minX == high.bounds.minX, "\(scale)")
             if scaled.points[0].y > 0 {
