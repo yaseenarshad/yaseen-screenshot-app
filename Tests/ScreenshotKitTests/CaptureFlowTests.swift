@@ -529,7 +529,7 @@ private final class CountingSound: SoundPlaying {
         #expect(sandbox.pasteboard.data(forType: .png) == saved.data)
     }
 
-    /// YAZ-3318: type a text, press Return, press 6, drag a corner, press Enter. The PNG has the
+    /// YAZ-3318: type a text, press Return, press 4, drag a corner, press Enter. The PNG has the
     /// text at the size of the drag, at its place, with no outline and no handle.
     @MainActor @Test func aTextThatWasMadeLargerIsSavedAtItsNewSize() async throws {
         let sandbox = try Sandbox()
@@ -546,9 +546,9 @@ private final class CountingSound: SoundPlaying {
         interaction.pointerDown(at: CGPoint(x: 20, y: 25), on: retina)
         interaction.pointerUp(at: CGPoint(x: 20, y: 25))
         interaction.textChanged("Hi")
-        // Return selects the text, and 6 makes it 40 points.
+        // Return selects the text, and 4 makes it 40 points.
         interaction.completeText(selectsNewText: true)
-        interaction.toolbarKey("6")
+        interaction.toolbarKey("4")
         // A drag of the bottom-right corner, 1.5 times as far from the top-left corner: 60 points.
         let forty = try #require(interaction.selectedMark)
         let outline = forty.outline

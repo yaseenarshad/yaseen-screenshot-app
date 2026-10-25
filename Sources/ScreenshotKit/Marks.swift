@@ -94,9 +94,10 @@ public struct MarkStyle: Equatable {
 
     /// The smallest and the largest font of a Text mark.
     public static let fontSizes: ClosedRange<CGFloat> = 8...256
-    /// The font of a selected Text mark for the keys 1 to 9 and 0, as in Yaseen Draw (YAZ-3318).
+    /// The font of a selected Text mark for the keys 1 to 9 and 0 (YAZ-3318). Each key is about
+    /// 1.4 times the key before, so the font doubles every two keys. 0 is the largest font.
     public static let digitFontSizes: [String: CGFloat] = [
-        "1": 12, "2": 16, "3": 20, "4": 24, "5": 32, "6": 40, "7": 56, "8": 72, "9": 96, "0": 128,
+        "1": 14, "2": 20, "3": 28, "4": 40, "5": 56, "6": 80, "7": 112, "8": 160, "9": 220, "0": 256,
     ]
 
     /// The font of a Text mark for each size, in points.

@@ -654,10 +654,15 @@ extension Toolbar {
         #expect(view.hitTest(CGPoint(x: field.frame.minX + 150, y: field.frame.maxY - 8)) === view)
         #expect(view.hitTest(CGPoint(x: 150, y: 450)) === view)
 
-        // A click in a different place completes the text, and puts a new field there.
+        // A click in a different place completes the text, as in Excalidraw: the Text tool turns
+        // off, and "Select" turns on. The click puts no new field (YAZ-3318).
         try stage.click(at: CGPoint(x: 150, y: 120))
         #expect(stage.interaction.marks.marks.map(\.text) == ["Hello", "Two words"])
         #expect(stage.interaction.marks.marks.last?.style.color == .blue)
+        #expect(view.textView == nil && stage.interaction.tool == nil && stage.interaction.isSelecting)
+        // T starts the next text: a click puts a new field there.
+        try stage.press("Text")
+        try stage.click(at: CGPoint(x: 150, y: 120))
         let next = try #require(view.textView)
         #expect(next !== field && panel.firstResponder === next)
 
@@ -733,9 +738,9 @@ extension Toolbar {
         }
         let thick = try #require(toolbar.button(named: "Thick") as? ToolbarButton)
         #expect(thick.isOn)
-        // A digit gives 32 points (D2). No size has 32 points, so no size is on (D7).
+        // A digit gives 56 points (D2). No size has 56 points, so no size is on (D7).
         interaction.toolbarKey("5")
-        #expect(interaction.marks.marks[1].style.fontSize == 32)
+        #expect(interaction.marks.marks[1].style.fontSize == 56)
         for size in ["Thin", "Medium", "Thick"] {
             #expect((toolbar.button(named: size) as? ToolbarButton)?.isOn == false, "\(size)")
         }

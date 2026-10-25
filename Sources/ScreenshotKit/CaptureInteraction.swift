@@ -263,7 +263,18 @@ public final class CaptureInteraction {
         dragIsPastMinimum = false
         guard !isFinished, let display = displays.first(where: { $0.displayID == displayID }) else { return }
         hover = (displayID, point)
-        // A click in a different place completes the text that is open.
+        // A click in a different place completes the text that is open, as in Excalidraw: the
+        // Text tool turns off, "Select" turns on with nothing selected, and the click does nothing
+        // more. T starts the next text (YAZ-3318). An empty text only closes, and the click works
+        // as with no open text (S20 of YAZ-2880).
+        if let edit = textEdit, !edit.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            completeText()
+            tool = nil
+            isSelecting = true
+            selectedIndex = nil
+            onChange?()
+            return
+        }
         completeText()
 
         let selection = self.selection(on: displayID)
