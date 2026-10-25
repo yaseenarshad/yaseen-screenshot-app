@@ -263,7 +263,18 @@ public final class CaptureInteraction {
         dragIsPastMinimum = false
         guard !isFinished, let display = displays.first(where: { $0.displayID == displayID }) else { return }
         hover = (displayID, point)
-        // A click in a different place completes the text that is open.
+        // A click in a different place completes the text that is open, as in Excalidraw: the
+        // Text tool turns off, "Select" turns on with nothing selected, and the click does nothing
+        // more. T starts the next text (YAZ-3318). An empty text only closes, and the click works
+        // as with no open text (S20 of YAZ-2880).
+        if let edit = textEdit, !edit.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            completeText()
+            tool = nil
+            isSelecting = true
+            selectedIndex = nil
+            onChange?()
+            return
+        }
         completeText()
 
         let selection = self.selection(on: displayID)
@@ -368,6 +379,8 @@ public final class CaptureInteraction {
                 } else {
                     marks.add(draft.mark)
                 }
+                // A corner drag of a text sets the font of the next text too, as a digit does (YAZ-3318).
+                if case .resizeMark = drag, draft.mark.tool == .text { styles[.text].fontSize = draft.mark.style.fontSize }
                 marksChanged()
             }
         case .move, .resize:
@@ -473,15 +486,21 @@ public final class CaptureInteraction {
         onChange?()
     }
 
-    /// A toolbar key (D2, YAZ-2872): it does the same as a click on its button, with one difference.
+    /// A toolbar key (D2, YAZ-2872): it does the same as a click on its button, with two differences.
     /// A tool key always selects its tool. A second press does not clear it, so the next drag
-    /// never moves the box by mistake.
+    /// never moves the box by mistake. And with a Text mark selected, a digit sets its font (YAZ-3318).
     ///
     /// A key with no box or during a drag does nothing: the mark in progress keeps its tool and
     /// its style. While a text is open, the text field has the keyboard and each key is for the typing.
     public func toolbarKey(_ key: String) {
-        guard !isFinished, box != nil, drag == nil, textEdit == nil, let action = toolbarKeys.action(for: key)
-        else { return }
+        guard !isFinished, box != nil, drag == nil, textEdit == nil else { return }
+        // With a Text mark selected, a digit sets its font (YAZ-3318). It wins over the size or the
+        // colour of that digit. A different mark keeps the keys of D4 (YAZ-2873).
+        if selectedMark?.tool == .text, let fontSize = MarkStyle.digitFontSizes[key] {
+            restyle { $0.fontSize = fontSize }
+            return
+        }
+        guard let action = toolbarKeys.action(for: key) else { return }
         switch action {
         case .select:
             if !isSelecting { toggleSelecting() }
@@ -638,7 +657,9 @@ public final class CaptureInteraction {
 
     /// Return, or a click in a different place: the open text becomes a mark. An empty text adds
     /// no mark. For a text that was open again, the mark changes, and an empty text removes it.
-    public func completeText() {
+    /// Return gives `selectsNewText`: a new text is then the selected mark, with "Select" on
+    /// (YAZ-3318). Thus a digit, a corner drag or a move works at once. T starts the next text.
+    public func completeText(selectsNewText: Bool = false) {
         guard !isFinished, let edit = textEdit else { return }
         textEdit = nil
         let mark = Mark(tool: .text, style: edit.style, points: [edit.origin], text: edit.text, wrapWidth: edit.wrapWidth)
@@ -655,6 +676,11 @@ public final class CaptureInteraction {
         } else if !isEmpty {
             marks.add(mark)
             marksRevision += 1
+            if selectsNewText {
+                tool = nil
+                isSelecting = true
+                selectedIndex = marks.marks.count - 1
+            }
         }
         onChange?()
     }

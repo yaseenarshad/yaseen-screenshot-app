@@ -113,7 +113,10 @@ final class Toolbar: NSView {
         let style = interaction.style
         selectButton?.isOn = interaction.isSelecting
         for (tool, button) in toolButtons { button.isOn = tool == interaction.tool }
-        for (size, button) in sizeButtons { button.isOn = size == style?.size }
+        // A size is on when its font is the font now. Thus a text with a font from a corner drag
+        // or a digit, that no size has, shows no size (YAZ-3318). For the other marks, the font
+        // always follows the size.
+        for (size, button) in sizeButtons { button.isOn = MarkStyle.fontSize(for: size) == style?.fontSize }
         for (color, button) in colorButtons { button.isOn = color == style?.color }
         if undoButton?.isEnabled != interaction.canUndo {
             undoButton?.isEnabled = interaction.canUndo

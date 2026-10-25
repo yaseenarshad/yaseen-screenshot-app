@@ -727,10 +727,141 @@ import Testing
         #expect(arrow.resized(.end(1), to: point(21, 30), in: box).points == [point(20, 30), point(24, 30)])
         #expect(arrow.resized(.end(1), to: point(20, 30), in: box) == arrow)
 
-        // A Pen, a Highlight and a Text mark have no handle. They only move.
-        for mark in [mark(.pen, .thin, [point(10, 10), point(40, 40)]), mark(.highlight, .thin, [point(10, 10), point(40, 40)]), text("Hi", at: point(10, 10))] {
+        // A Pen and a Highlight mark have no handle. They only move. A Text has four (YAZ-3318).
+        for mark in [mark(.pen, .thin, [point(10, 10), point(40, 40)]), mark(.highlight, .thin, [point(10, 10), point(40, 40)])] {
             #expect(mark.handles.isEmpty && mark.handle(at: mark.points[0]) == nil, "\(mark.tool)")
         }
+    }
+
+    /// YAZ-3318 D3 and D4: a corner of a Text changes its font, and the opposite corner stays.
+    /// The lines break at the right edge of the box, and a text that gets too tall moves up.
+    @Test func aCornerOfATextChangesItsFontAndTheOppositeCornerStays() throws {
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
+        let box = CGSize(width: 400, height: 300)
+        func text(_ string: String, at origin: CGPoint) -> Mark {
+            Mark(tool: .text, style: MarkStyle(color: .red, size: .thick), points: [origin], text: string, wrapWidth: box.width - origin.x)
+        }
+        /// The place of a pointer at `scale` along the diagonal of the outline, from the corner that stays.
+        func pointer(_ mark: Mark, _ corner: Handle, _ scale: CGFloat) -> CGPoint {
+            let opposite: [Handle: Handle] = [.topLeft: .bottomRight, .topRight: .bottomLeft, .bottomRight: .topLeft, .bottomLeft: .topRight]
+            let fixed = Selection.handlePoint(opposite[corner]!, of: mark.outline)
+            let start = Selection.handlePoint(corner, of: mark.outline)
+            return point(fixed.x + (start.x - fixed.x) * scale, fixed.y + (start.y - fixed.y) * scale)
+        }
+
+        // Four handles, at the corners of the outline (S11).
+        let hi = text("Hi", at: point(100, 100))
+        #expect(hi.handles.map(\.key) == [.frame(.topLeft), .frame(.topRight), .frame(.bottomRight), .frame(.bottomLeft)])
+        #expect(hi.handles.map(\.point) == [Handle.topLeft, .topRight, .bottomRight, .bottomLeft].map { Selection.handlePoint($0, of: hi.outline) })
+        #expect(hi.handle(at: Selection.handlePoint(.bottomRight, of: hi.outline))?.key == .frame(.bottomRight))
+        // A pointer that did not move changes nothing.
+        #expect(hi.resized(.frame(.bottomRight), to: pointer(hi, .bottomRight, 1), in: box) == hi)
+
+        // The bottom-right corner, two times as far: 48 points, and the top-left stays (S13).
+        let larger = hi.resized(.frame(.bottomRight), to: pointer(hi, .bottomRight, 2), in: box)
+        #expect(larger.style.fontSize == 48 && larger.points == hi.points && larger.style.color == .red)
+        #expect(larger.wrapWidth == box.width - larger.points[0].x)
+        // A left or a top corner: the opposite corner stays, to less than a point, and the text
+        // stays on whole points (S14). A longer text shows a drift that a short text hides.
+        // A larger box, so the text does not reach an edge.
+        let wide = CGSize(width: 800, height: 600)
+        let words = Mark(
+            tool: .text, style: MarkStyle(color: .red, size: .thick), points: [point(300, 250)], text: "Hello world", wrapWidth: 500
+        )
+        for (corner, scale) in [(Handle.topLeft, CGFloat(3)), (.topLeft, 0.5), (.bottomLeft, 3), (.topRight, 0.5)] {
+            let scaled = words.resized(.frame(corner), to: pointer(words, corner, scale), in: wide)
+            #expect(scaled.style.fontSize == (24 * scale).rounded(), "\(corner) \(scale)")
+            let origin = scaled.points[0]
+            #expect(origin.x == origin.x.rounded() && origin.y == origin.y.rounded(), "\(corner) \(scale)")
+            if corner.horizontal < 0 {
+                #expect(scaled.bounds.maxX <= words.bounds.maxX && scaled.bounds.maxX > words.bounds.maxX - 1, "\(corner) \(scale)")
+            } else {
+                #expect(scaled.bounds.minX == words.bounds.minX, "\(corner) \(scale)")
+            }
+            if corner.vertical < 0 {
+                #expect(scaled.bounds.maxY <= words.bounds.maxY && scaled.bounds.maxY > words.bounds.maxY - 1, "\(corner) \(scale)")
+            } else {
+                #expect(scaled.bounds.minY == words.bounds.minY, "\(corner) \(scale)")
+            }
+        }
+        // Half as far: 12 points (S15). Past the opposite corner, and very far: 8 and 256 (S16, S17).
+        #expect(hi.resized(.frame(.topRight), to: pointer(hi, .topRight, 0.5), in: box).style.fontSize == 12)
+        #expect(hi.resized(.frame(.bottomLeft), to: pointer(hi, .bottomLeft, -3), in: box).style.fontSize == 8)
+        #expect(hi.resized(.frame(.bottomRight), to: pointer(hi, .bottomRight, 40), in: box).style.fontSize == 256)
+
+        // Near the right edge, the lines break at the edge (S18). The text stays in the box.
+        let edge = text("Look here", at: point(300, 20))
+        let broken = edge.resized(.frame(.bottomRight), to: pointer(edge, .bottomRight, 2), in: box)
+        #expect(broken.style.fontSize == 48 && broken.points == edge.points)
+        #expect(broken.bounds.maxX <= box.width && broken.bounds.height > 2 * edge.bounds.height)
+        // Near the bottom edge, the text moves up (S19).
+        let low = text("Hi", at: point(100, 260))
+        let up = low.resized(.frame(.bottomRight), to: pointer(low, .bottomRight, 3), in: box)
+        #expect(up.style.fontSize == 72 && up.points[0].x == 100 && up.points[0].y < 260 && up.bounds.maxY <= box.height)
+    }
+
+    /// YAZ-3338 (the checker of PR 12): a top-left or bottom-left corner drag that brings a text to
+    /// the left edge of the box. Up to the edge, the corner that stays does not move. At the edge,
+    /// the text stops at x 0 and grows to the right (D4). It never jumps.
+    @Test func aLeftCornerDragToTheLeftEdgeStopsAtTheEdgeAndDoesNotJump() {
+        let box = CGSize(width: 400, height: 300)
+        let words = Mark(
+            tool: .text, style: MarkStyle(color: .red, size: .thick), points: [CGPoint(x: 60, y: 200)],
+            text: "Hello world", wrapWidth: 340
+        )
+        let outline = words.outline
+        var lastFont: CGFloat = 0
+        for scale in [CGFloat(1.2), 1.45, 1.5, 1.55, 1.6, 2] {
+            let pointer = CGPoint(x: outline.maxX - outline.width * scale, y: outline.maxY - outline.height * scale)
+            let scaled = words.resized(.frame(.topLeft), to: pointer, in: box)
+            // The bottom stays, at each scale.
+            #expect(abs(scaled.bounds.maxY - words.bounds.maxY) < 1, "\(scale)")
+            #expect(scaled.style.fontSize > lastFont, "\(scale)")
+            lastFont = scaled.style.fontSize
+            if scaled.points[0].x > 0 {
+                // Room on the left: the right edge stays too.
+                #expect(scaled.bounds.maxX <= words.bounds.maxX && scaled.bounds.maxX > words.bounds.maxX - 1, "\(scale)")
+            } else {
+                // At the left edge: the text grows to the right, on one line, in the box.
+                #expect(scaled.bounds.maxX >= words.bounds.maxX && scaled.bounds.maxX <= box.width, "\(scale)")
+            }
+            let bottomLeft = words.resized(.frame(.bottomLeft), to: CGPoint(x: pointer.x, y: outline.minY + outline.height * scale), in: box)
+            #expect(bottomLeft.bounds.minY == words.bounds.minY && bottomLeft.points[0].x >= 0, "\(scale)")
+        }
+        // The last scales reach the left edge.
+        #expect(words.resized(.frame(.topLeft), to: CGPoint(x: -100, y: 0), in: box).points[0].x == 0)
+
+        // A top corner drag past the top edge: the text stops at y 0 and grows down. It never jumps.
+        let high = Mark(
+            tool: .text, style: MarkStyle(color: .red, size: .thick), points: [CGPoint(x: 100, y: 20)],
+            text: "Hi", wrapWidth: 300
+        )
+        let highOutline = high.outline
+        var lastBottom = high.bounds.maxY
+        for scale in [CGFloat(1.2), 1.5, 2, 3] {
+            // Along the diagonal, from the bottom-left corner that stays.
+            let pointer = CGPoint(
+                x: highOutline.minX + highOutline.width * scale, y: highOutline.maxY - highOutline.height * scale
+            )
+            let scaled = high.resized(.frame(.topRight), to: pointer, in: box)
+            #expect(scaled.points[0].y >= 0 && scaled.bounds.minX == high.bounds.minX, "\(scale)")
+            if scaled.points[0].y > 0 {
+                #expect(abs(scaled.bounds.maxY - high.bounds.maxY) < 1, "\(scale)")
+            } else {
+                #expect(scaled.bounds.maxY >= lastBottom, "\(scale)")
+            }
+            lastBottom = scaled.bounds.maxY
+        }
+    }
+
+    /// YAZ-3318 D1: a size sets the font of a Text again, also after a free font.
+    @Test func aSizeSetsTheFontAgainAfterAFreeFont() {
+        var style = MarkStyle(color: .red, size: .thin)
+        #expect(style.fontSize == 14)
+        style.fontSize = 72
+        #expect(style != MarkStyle(color: .red, size: .thin))
+        style.size = .medium
+        #expect(style == MarkStyle(color: .red, size: .medium) && style.fontSize == 18)
     }
 }
 

@@ -528,4 +528,58 @@ private final class CountingSound: SoundPlaying {
         #expect(redPixels == (2 * 720 - 2 * 16) * scale * scale)
         #expect(sandbox.pasteboard.data(forType: .png) == saved.data)
     }
+
+    /// YAZ-3318: type a text, press Return, press 4, drag a corner, press Enter. The PNG has the
+    /// text at the size of the drag, at its place, with no outline and no handle.
+    @MainActor @Test func aTextThatWasMadeLargerIsSavedAtItsNewSize() async throws {
+        let sandbox = try Sandbox()
+        let saver = ScreenshotSaver(pasteboard: sandbox.pasteboard, folder: sandbox.folder)
+        let interaction = CaptureInteraction(displays: try await FakeScreenCapture().freezeAllDisplays(), styles: ToolStyleMemory())
+        var outcome: CaptureOutcome?
+        interaction.onFinish = { outcome = $0 }
+
+        // The box: x 10 to 190, y 5 to 95 of the retina screen. The text "Hi" starts at 10, 5 of the box.
+        let retina = FakeScreenCapture.retinaID
+        interaction.pointerDown(at: CGPoint(x: 10, y: 5), on: retina)
+        interaction.pointerUp(at: CGPoint(x: 190, y: 95))
+        interaction.selectTool(.text)
+        interaction.pointerDown(at: CGPoint(x: 20, y: 25), on: retina)
+        interaction.pointerUp(at: CGPoint(x: 20, y: 25))
+        interaction.textChanged("Hi")
+        // Return selects the text, and 4 makes it 40 points.
+        interaction.completeText(selectsNewText: true)
+        interaction.toolbarKey("4")
+        // A drag of the bottom-right corner, 1.5 times as far from the top-left corner: 60 points.
+        let forty = try #require(interaction.selectedMark)
+        let outline = forty.outline
+        let corner = CGPoint(x: outline.maxX, y: outline.maxY)
+        let far = CGPoint(x: outline.minX + outline.width * 1.5, y: outline.minY + outline.height * 1.5)
+        interaction.pointerDown(at: CGPoint(x: 10 + corner.x, y: 5 + corner.y), on: retina)
+        interaction.pointerDragged(to: CGPoint(x: 10 + far.x, y: 5 + far.y))
+        interaction.pointerUp(at: CGPoint(x: 10 + far.x, y: 5 + far.y))
+        let text = try #require(interaction.marks.marks.first)
+        #expect(text.style.fontSize == 60 && text.points == [CGPoint(x: 10, y: 5)])
+        interaction.key(.enter)
+
+        try saver.deliver(try #require(outcome), date: day)
+        saver.waitForPendingWrites()
+        let saved = try savedImage(in: sandbox)
+        let pixels = PixelReader(saved.image)
+        // Each pixel that changed is in the bounds of the text, and the letters are as tall as a
+        // font of 60 points: "H" is about 42 points tall. A font of 40 points gives about 28.
+        let bounds = text.bounds
+        var top = Int.max, bottom = Int.min
+        for y in 0..<pixels.height {
+            for x in 0..<pixels.width where pixels[x, y] != patternPixel(x: 20 + x, y: 10 + y) {
+                let point = CGPoint(x: (CGFloat(x) + 0.5) / 2, y: (CGFloat(y) + 0.5) / 2)
+                if !bounds.insetBy(dx: -1, dy: -1).contains(point) {
+                    Issue.record("The pixel \(x), \(y) is outside the text, but it changed")
+                    return
+                }
+                top = min(top, y)
+                bottom = max(bottom, y)
+            }
+        }
+        #expect((bottom - top) / 2 > 38 && (bottom - top) / 2 < 48, "the letters are \((bottom - top) / 2) points tall")
+    }
 }

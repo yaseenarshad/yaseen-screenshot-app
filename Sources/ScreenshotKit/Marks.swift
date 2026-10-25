@@ -58,14 +58,21 @@ public enum MarkColor: Hashable, CaseIterable {
     }
 }
 
-/// The colour and the size of a mark.
+/// The colour and the size of a mark, and the font of a Text mark.
 public struct MarkStyle: Equatable {
     public var color: MarkColor
-    public var size: MarkSize
+    /// A new size also sets the font of a Text mark (YAZ-2782 row 18).
+    public var size: MarkSize {
+        didSet { fontSize = MarkStyle.fontSize(for: size) }
+    }
+    /// The size of the font of a Text mark, in points. A corner drag or a digit key can set any
+    /// size in `fontSizes` (YAZ-3318).
+    public var fontSize: CGFloat
 
     public init(color: MarkColor, size: MarkSize) {
         self.color = color
         self.size = size
+        fontSize = MarkStyle.fontSize(for: size)
     }
 
     /// The style of a tool before the user changed it: the thickest size (D15 on YAZ-2782).
@@ -85,8 +92,16 @@ public struct MarkStyle: Equatable {
         }
     }
 
-    /// The size of the font of a Text mark, in points.
-    public var fontSize: CGFloat {
+    /// The smallest and the largest font of a Text mark.
+    public static let fontSizes: ClosedRange<CGFloat> = 8...256
+    /// The font of a selected Text mark for the keys 1 to 9 and 0 (YAZ-3318). From 1 to 9, each key
+    /// is about 1.4 times the key before. 0 is the largest font.
+    public static let digitFontSizes: [String: CGFloat] = [
+        "1": 14, "2": 20, "3": 28, "4": 40, "5": 56, "6": 80, "7": 112, "8": 160, "9": 220, "0": 256,
+    ]
+
+    /// The font of a Text mark for each size, in points.
+    static func fontSize(for size: MarkSize) -> CGFloat {
         switch size {
         case .thin: return 14
         case .medium: return 18
@@ -145,7 +160,8 @@ public struct Mark: Equatable {
 
 /// A handle of the selected mark.
 public enum MarkHandle: Hashable {
-    /// Rectangle and Ellipse: one of the eight handles of the rectangle of the mark.
+    /// Rectangle and Ellipse: one of the eight handles of the rectangle of the mark. Text: one of
+    /// the four corners of its outline (YAZ-3318).
     case frame(Handle)
     /// Arrow: the start (0) or the end with the head (1).
     case end(Int)
@@ -292,7 +308,8 @@ extension Mark {
     // MARK: Handles, move and size change
 
     /// The handles of the selected mark, with their places: eight for a Rectangle and an Ellipse,
-    /// and one at each end of an Arrow. A Pen, a Highlight, a Text and a Number mark only move.
+    /// one at each end of an Arrow, and four at the corners of the outline of a Text (YAZ-3318).
+    /// A Pen, a Highlight and a Number mark only move.
     public var handles: [(key: MarkHandle, point: CGPoint)] {
         switch tool {
         case .rectangle, .ellipse:
@@ -300,7 +317,12 @@ extension Mark {
             return Handle.allCases.map { (.frame($0), Selection.handlePoint($0, of: frame)) }
         case .arrow:
             return points.indices.map { (.end($0), points[$0]) }
-        case .pen, .highlight, .text, .number:
+        case .text:
+            let outline = self.outline
+            return [Handle.topLeft, .topRight, .bottomRight, .bottomLeft].map {
+                (.frame($0), Selection.handlePoint($0, of: outline))
+            }
+        case .pen, .highlight, .number:
             return []
         }
     }
@@ -337,8 +359,11 @@ extension Mark {
     /// The mark after `handle` moved to `point`, in a box of `size`. A Rectangle and an Ellipse
     /// follow the rules of the box: the opposite edges stay, a handle that goes through the
     /// opposite edge turns the mark over, and the smallest side is `Selection.minimumSide`.
-    /// An end of an Arrow moves, and its other end stays.
+    /// An end of an Arrow moves, and its other end stays. A corner of a Text changes its font.
     public func resized(_ handle: MarkHandle, to point: CGPoint, in size: CGSize) -> Mark {
+        if tool == .text, case .frame(let corner) = handle {
+            return scaledText(by: corner, to: point, in: size)
+        }
         var resized = self
         switch handle {
         case .frame(let handle):
@@ -367,6 +392,45 @@ extension Mark {
             resized.points[index] = end
         }
         return resized
+    }
+
+    /// A Text mark after the corner handle `corner` moved to `point`, in a box of `size`
+    /// (YAZ-3318). The font grows or shrinks, and the opposite corner stays. The scale is how far
+    /// the pointer is along the diagonal of the outline: 1 at the corner where the drag started.
+    private func scaledText(by corner: Handle, to point: CGPoint, in size: CGSize) -> Mark {
+        // One layout for the bounds and the outline: a drag calls this for each pointer event.
+        let bounds = self.bounds
+        let outline = bounds.insetBy(dx: -Mark.outlineGap, dy: -Mark.outlineGap)
+        guard style.fontSize > 0 else { return self }
+        let fixed = CGPoint(
+            x: corner.horizontal < 0 ? outline.maxX : outline.minX,
+            y: corner.vertical < 0 ? outline.maxY : outline.minY
+        )
+        let start = Selection.handlePoint(corner, of: outline)
+        let diagonal = CGPoint(x: start.x - fixed.x, y: start.y - fixed.y)
+        let lengthSquared = diagonal.x * diagonal.x + diagonal.y * diagonal.y
+        guard lengthSquared > 0 else { return self }
+        let scale = ((point.x - fixed.x) * diagonal.x + (point.y - fixed.y) * diagonal.y) / lengthSquared
+
+        var scaled = self
+        let fonts = MarkStyle.fontSizes
+        scaled.style.fontSize = min(max((style.fontSize * scale).rounded(), fonts.lowerBound), fonts.upperBound)
+        // The text grows from the corner that stays. Its lines start at its origin (the text has
+        // no padding), so the bounds start there too. The lines of a saved text break at the right
+        // edge of the box. A text that grows to the left can start at the left edge, so its layout
+        // gets the full width of the box: then the lines are the lines that the text gets at its
+        // place. Where the room ends, the text stops at the left edge and grows to the right (D4).
+        let widthForLines = corner.horizontal < 0 ? size.width : size.width - bounds.minX
+        let used = TextLayout(text: text, style: scaled.style, wrapWidth: widthForLines).usedRect.size
+        // Whole points, as a new text. Down, so the corner that stays is never passed.
+        let x = corner.horizontal < 0 ? max((bounds.maxX - used.width).rounded(.down), 0) : bounds.minX
+        let y = corner.vertical < 0 ? (bounds.maxY - used.height).rounded(.down) : bounds.minY
+        scaled.points = [CGPoint(x: x, y: y)]
+        // `moved` measures the text with this width, before it sets the same width again.
+        scaled.wrapWidth = size.width - x
+        // The lines break at the right edge of the box, and a text that is too tall moves up, as
+        // after a size change (D4).
+        return scaled.moved(by: .zero, in: size)
     }
 }
 

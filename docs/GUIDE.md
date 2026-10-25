@@ -10,7 +10,7 @@ How to install and use Yaseen Screenshot, with each detail. The short version is
 4. Start the app from `/Applications`. macOS stops it the first time, because the app is not notarized.
 5. Open System Settings, then Privacy & Security. Click "Open Anyway" next to "Yaseen Screenshot". You do this one time.
 6. The app asks for the Screen Recording permission. Open System Settings, Privacy & Security, Screen & System Audio Recording. Turn on "Yaseen Screenshot".
-7. If macOS asks, quit the app and open it again. Then press Shift-Command-D.
+7. Click **Quit and Reopen** in the window of the app. macOS gives the app the permission only when the app starts again. Then press Shift-Command-D.
 
 ### If you do not see the menu bar icon
 
@@ -22,7 +22,9 @@ A MacBook with a notch hides the icons that do not fit. A full menu bar can put 
 
 ### If macOS asks for the permission again after an update
 
-The download from GitHub has a simple signature. Thus macOS sees an update as a new app, and asks for the Screen Recording permission again. Turn it on again.
+The download from GitHub has a simple signature. Thus macOS sees an update as a new app, and asks for the Screen Recording permission again. Turn it on again, then click **Quit and Reopen**.
+
+If the switch in System Settings is on and the app still asks, click **Quit and Reopen** too. The app reads the permission only when it starts.
 
 If you build the app yourself with a fixed certificate, macOS asks one time only. The [developer page](DEVELOPMENT.md) tells how.
 
@@ -38,10 +40,10 @@ Esc or Cancel stops the capture. Nothing is copied and nothing is saved. Esc fir
 
 ### The toolbar
 
-- **Select:** click a mark to select it. Drag it to move it. Drag a handle to change a rectangle, an ellipse or an arrow. Delete removes it. A double-click on a text opens the text again. Command-C copies it, Command-X cuts it, and Command-V pastes a copy 16 points to the right and down. After a cut, the first paste goes to the same place. The copy stays until you copy or cut a different mark, or quit the app.
-- **Rectangle, Ellipse, Arrow, Pen, Highlight, Text:** drag in the box to draw. For Text, click, type, and press Return.
+- **Select:** click a mark to select it. Drag it to move it. Drag a handle to change a rectangle, an ellipse or an arrow. Drag a corner of a text to make it bigger or smaller. Delete removes it. A double-click on a text opens the text again. Command-C copies it, Command-X cuts it, and Command-V pastes a copy 16 points to the right and down. After a cut, the first paste goes to the same place. The copy stays until you copy or cut a different mark, or quit the app.
+- **Rectangle, Ellipse, Arrow, Pen, Highlight, Text:** drag in the box to draw. For Text, click, type, and press Return. Return selects the text, so you can size it or move it at once. A click in a different place also finishes the text, and gives you Select with nothing selected. Press T for the next text.
 - **Number:** click in the box to put a numbered circle: 1, 2, 3. The next number is the highest number in the box, plus 1.
-- **Sizes and colours:** Thin, Medium and Thick, and six colours. They show when a tool or a mark is selected, and they change the selected mark. Each tool starts with Thick and red. Highlight starts with amber.
+- **Sizes and colours:** Thin, Medium and Thick, and six colours. They show when a tool or a mark is selected, and they change the selected mark. Each tool starts with Thick and red. Highlight starts with amber. For a text, Thin, Medium and Thick are 14, 18 and 24 points. A text of a different size shows no size as selected.
 - **Undo:** the button or Command-Z. Shift-Command-Z puts the change back.
 
 While marks exist, the box does not move, and a right-click does nothing.
@@ -62,8 +64,10 @@ One key selects a tool, a size or a colour. Thus you can drag the box, press A, 
 | N | Number |
 | 1, 2, 3 | Thin, Medium, Thick |
 | 4 to 9 | Red, Amber, Green, Blue, Black, White |
+| 1 to 9, 0 (a text is selected) | Font size 14, 20, 28, 40, 56, 80, 112, 160, 220, 256 |
 
-- The keys are the keys of Yaseen Screendraw.
+- The keys are the keys of Yaseen Screendraw. The font keys of a text work as in Yaseen Draw, with larger steps: from 1 to 9, each key is about 1.4 times the key before. 0 is the largest font.
+- While a text is selected, the digits set its font, also a digit that you gave to a different action in the settings. Thus, after Return, 7 gives 112 points, not blue. To change the colour of a selected text, click the colour.
 - A tool key always selects its tool. A second press keeps it. A click on the selected tool still clears it.
 - A key works after the box exists. It does nothing during a drag. While you type a text, each key is for the text.
 - Move the pointer onto the toolbar to see the keys. The tip of each button names its key too.
