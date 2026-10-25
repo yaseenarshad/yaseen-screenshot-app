@@ -316,8 +316,8 @@ final class OverlayView: NSView, NSTextViewDelegate {
     func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         switch commandSelector {
         case #selector(NSResponder.insertNewline(_:)):
-            // Return completes the text. Option-Return still makes a new line.
-            interaction.completeText()
+            // Return completes the text and selects it. Option-Return still makes a new line.
+            interaction.returnInText()
             return true
         case #selector(NSResponder.cancelOperation(_:)):
             interaction.key(.escape)

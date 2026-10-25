@@ -1250,6 +1250,77 @@ import Testing
         #expect(harness.doneResult?.marks.marks.map(\.text) == ["", "", "Last"])
     }
 
+    /// YAZ-3318: Return selects a new text (D6). Then a digit (D2) and a corner drag (D3) change its
+    /// font, and the next text starts with that font (D5). With no selected text, the digits pick a
+    /// size and a colour, as before.
+    @MainActor @Test func aSelectedTextTakesItsFontFromADigitAndACornerDrag() async throws {
+        let styles = ToolStyleMemory()
+        let harness = try await harnessWithBox(styles: styles)
+        let interaction = harness.interaction
+        let boxOrigin = CGPoint(x: boxRect.minX, y: boxRect.minY)
+
+        // Return on an empty text adds no mark, and the Text tool stays on (S32).
+        interaction.selectTool(.text)
+        harness.click(at: CGPoint(x: 45, y: 35), on: retina)
+        interaction.returnInText()
+        #expect(interaction.marks.isEmpty && interaction.tool == .text && interaction.selectedIndex == nil)
+
+        // Return completes a new text and selects it, with "Select" on and the Text tool off (S31).
+        harness.click(at: CGPoint(x: 45, y: 35), on: retina)
+        interaction.textChanged("Hi")
+        interaction.returnInText()
+        let hi = try #require(interaction.marks.marks.first)
+        #expect(hi.points == [CGPoint(x: 5, y: 0)] && hi.style.fontSize == 24)
+        #expect(interaction.selectedIndex == 0 && interaction.isSelecting && interaction.tool == nil)
+        #expect(interaction.selectedMark?.handles.count == 4)
+
+        // A digit sets the font, and the top-left stays (S1). The same digit again is no new step (S2).
+        interaction.toolbarKey("1")
+        #expect(interaction.marks.marks[0].style.fontSize == 12 && interaction.marks.marks[0].points == hi.points)
+        interaction.toolbarKey("1")
+        interaction.undo()
+        #expect(interaction.marks.marks == [hi])
+
+        // A digit from 4 to 9 sets the font of a selected text, not its colour (S8).
+        harness.click(at: CGPoint(x: 50, y: 30), on: retina)
+        #expect(interaction.selectedIndex == 0)
+        interaction.toolbarKey("6")
+        #expect(interaction.marks.marks[0].style.fontSize == 40 && interaction.marks.marks[0].style.color == .red)
+        #expect(styles[.text].fontSize == 40)
+
+        // A drag of the bottom-right corner to the middle of the diagonal: half the font (S13, S15).
+        let forty = interaction.marks.marks[0]
+        let handle = try #require(forty.handles.first { $0.key == .frame(.bottomRight) })
+        let outline = forty.outline
+        let middle = CGPoint(x: (outline.minX + handle.point.x) / 2, y: (outline.minY + handle.point.y) / 2)
+        harness.drag(
+            from: CGPoint(x: boxOrigin.x + handle.point.x, y: boxOrigin.y + handle.point.y),
+            to: CGPoint(x: boxOrigin.x + middle.x, y: boxOrigin.y + middle.y), on: retina
+        )
+        #expect(interaction.marks.marks[0].style.fontSize == 20 && interaction.marks.marks[0].points == hi.points)
+        // The next text gets the font of the drag too (S26). One drag is one Undo step (S20).
+        #expect(styles[.text].fontSize == 20)
+        interaction.undo()
+        #expect(interaction.marks.marks == [forty])
+        interaction.redo()
+        #expect(interaction.marks.marks[0].style.fontSize == 20)
+
+        // With no selected text, the digits pick a size and a colour, as before (S5). Redo cleared
+        // the selection.
+        #expect(interaction.selectedIndex == nil)
+        interaction.selectTool(.text)
+        interaction.toolbarKey("2")
+        interaction.toolbarKey("6")
+        #expect(styles[.text] == MarkStyle(color: .green, size: .medium) && interaction.marks.marks.count == 1)
+
+        // A click in a different place completes the text, and does not select it (S34).
+        harness.click(at: CGPoint(x: 100, y: 40), on: retina)
+        interaction.textChanged("Two")
+        harness.click(at: CGPoint(x: 60, y: 60), on: retina)
+        #expect(interaction.marks.marks.count == 2 && interaction.selectedIndex == nil && interaction.tool == .text)
+        #expect(interaction.marks.marks[1].style.fontSize == 18)
+    }
+
     // MARK: The click on a window (YAZ-2769)
 
     /// Two windows on the retina screen. The first is in front. They overlap from x 60 to 120, y 30 to 70.

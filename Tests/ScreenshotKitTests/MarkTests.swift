@@ -727,10 +727,69 @@ import Testing
         #expect(arrow.resized(.end(1), to: point(21, 30), in: box).points == [point(20, 30), point(24, 30)])
         #expect(arrow.resized(.end(1), to: point(20, 30), in: box) == arrow)
 
-        // A Pen, a Highlight and a Text mark have no handle. They only move.
-        for mark in [mark(.pen, .thin, [point(10, 10), point(40, 40)]), mark(.highlight, .thin, [point(10, 10), point(40, 40)]), text("Hi", at: point(10, 10))] {
+        // A Pen and a Highlight mark have no handle. They only move. A Text has four (YAZ-3318).
+        for mark in [mark(.pen, .thin, [point(10, 10), point(40, 40)]), mark(.highlight, .thin, [point(10, 10), point(40, 40)])] {
             #expect(mark.handles.isEmpty && mark.handle(at: mark.points[0]) == nil, "\(mark.tool)")
         }
+    }
+
+    /// YAZ-3318 D3 and D4: a corner of a Text changes its font, and the opposite corner stays.
+    /// The lines break at the right edge of the box, and a text that gets too tall moves up.
+    @Test func aCornerOfATextChangesItsFontAndTheOppositeCornerStays() throws {
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
+        let box = CGSize(width: 400, height: 300)
+        func text(_ string: String, at origin: CGPoint) -> Mark {
+            Mark(tool: .text, style: MarkStyle(color: .red, size: .thick), points: [origin], text: string, wrapWidth: box.width - origin.x)
+        }
+        /// The place of a pointer at `scale` along the diagonal of the outline, from the corner that stays.
+        func pointer(_ mark: Mark, _ corner: Handle, _ scale: CGFloat) -> CGPoint {
+            let opposite: [Handle: Handle] = [.topLeft: .bottomRight, .topRight: .bottomLeft, .bottomRight: .topLeft, .bottomLeft: .topRight]
+            let fixed = Selection.handlePoint(opposite[corner]!, of: mark.outline)
+            let start = Selection.handlePoint(corner, of: mark.outline)
+            return point(fixed.x + (start.x - fixed.x) * scale, fixed.y + (start.y - fixed.y) * scale)
+        }
+
+        // Four handles, at the corners of the outline (S11).
+        let hi = text("Hi", at: point(100, 100))
+        #expect(hi.handles.map(\.key) == [.frame(.topLeft), .frame(.topRight), .frame(.bottomRight), .frame(.bottomLeft)])
+        #expect(hi.handles.map(\.point) == [Handle.topLeft, .topRight, .bottomRight, .bottomLeft].map { Selection.handlePoint($0, of: hi.outline) })
+        #expect(hi.handle(at: Selection.handlePoint(.bottomRight, of: hi.outline))?.key == .frame(.bottomRight))
+        // A pointer that did not move changes nothing.
+        #expect(hi.resized(.frame(.bottomRight), to: pointer(hi, .bottomRight, 1), in: box) == hi)
+
+        // The bottom-right corner, two times as far: 48 points, and the top-left stays (S13).
+        let larger = hi.resized(.frame(.bottomRight), to: pointer(hi, .bottomRight, 2), in: box)
+        #expect(larger.style.fontSize == 48 && larger.points == hi.points && larger.style.color == .red)
+        #expect(larger.wrapWidth == box.width - larger.points[0].x)
+        // The top-left corner, two times as far: the bottom-right stays, to a point (S14).
+        let fromTopLeft = hi.resized(.frame(.topLeft), to: pointer(hi, .topLeft, 2), in: box)
+        #expect(fromTopLeft.style.fontSize == 48)
+        #expect(abs(fromTopLeft.bounds.maxX - hi.bounds.maxX) <= 1 && abs(fromTopLeft.bounds.maxY - hi.bounds.maxY) <= 1)
+        // Half as far: 12 points (S15). Past the opposite corner, and very far: 8 and 256 (S16, S17).
+        #expect(hi.resized(.frame(.topRight), to: pointer(hi, .topRight, 0.5), in: box).style.fontSize == 12)
+        #expect(hi.resized(.frame(.bottomLeft), to: pointer(hi, .bottomLeft, -3), in: box).style.fontSize == 8)
+        #expect(hi.resized(.frame(.bottomRight), to: pointer(hi, .bottomRight, 40), in: box).style.fontSize == 256)
+
+        // Near the right edge, the lines break at the edge (S18). The text stays in the box.
+        let edge = text("Look here", at: point(300, 20))
+        let broken = edge.resized(.frame(.bottomRight), to: pointer(edge, .bottomRight, 2), in: box)
+        #expect(broken.style.fontSize == 48 && broken.points == edge.points)
+        #expect(broken.bounds.maxX <= box.width && broken.bounds.height > 2 * edge.bounds.height)
+        // Near the bottom edge, the text moves up (S19).
+        let low = text("Hi", at: point(100, 260))
+        let up = low.resized(.frame(.bottomRight), to: pointer(low, .bottomRight, 3), in: box)
+        #expect(up.style.fontSize == 72 && up.points[0].x == 100 && up.points[0].y < 260 && up.bounds.maxY <= box.height)
+    }
+
+    /// YAZ-3318 D1: a size sets the font of a Text again, also after a free font.
+    @Test func aSizeSetsTheFontAgainAfterAFreeFont() {
+        var style = MarkStyle(color: .red, size: .thin)
+        #expect(style.fontSize == 14)
+        style.fontSize = 72
+        #expect(style != MarkStyle(color: .red, size: .thin))
+        style.size = .medium
+        #expect(style == MarkStyle(color: .red, size: .medium) && style.fontSize == 18)
+        #expect(MarkStyle.digitFontSizes.count == 10 && MarkStyle.digitFontSizes["0"] == 128)
     }
 }
 

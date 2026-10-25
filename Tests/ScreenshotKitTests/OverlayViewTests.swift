@@ -607,6 +607,11 @@ extension Toolbar {
         #expect(panel.firstResponder === view)
         let hello = try #require(stage.interaction.marks.marks.last)
         #expect(hello.text == "Hello" && hello.points == [CGPoint(x: 100, y: 39)] && hello.wrapWidth == 300)
+        // Return also selected the text (YAZ-3318 D6). Esc clears the selection, so the overlay
+        // shows no outline below.
+        #expect(stage.interaction.selectedIndex == 0)
+        stage.interaction.key(.escape)
+        #expect(stage.interaction.selectedIndex == nil && stage.interaction.textEdit == nil)
 
         // The saved image has the text where the field showed it, and the overlay shows the same pixels.
         let selection = try #require(stage.interaction.selection(on: stage.display.displayID))
@@ -632,7 +637,9 @@ extension Toolbar {
         }
         #expect(textPixels > 100)
 
-        // A change of the colour while a text is open applies to the field.
+        // A change of the colour while a text is open applies to the field. Return turned the
+        // Text tool off, so the test selects it again.
+        try stage.press("Text")
         try stage.click(at: CGPoint(x: 300, y: 250))
         field = try #require(view.textView)
         field.insertText("Two words", replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -714,9 +721,26 @@ extension Toolbar {
         #expect(interaction.marks.marks.map(\.tool) == [.rectangle, .text])
         #expect(interaction.marks.marks[1].points == [CGPoint(x: 60, y: 30)])
 
+        // Return selects the new text, with "Select" on (YAZ-3318 D6). The text shows four white
+        // handles, at the corners of its outline (D3). Its font is 24, so Thick is on (D7).
+        #expect(interaction.isSelecting && interaction.selectedIndex == 1 && interaction.tool == nil)
+        let hello = try #require(interaction.selectedMark)
+        #expect(hello.handles.count == 4)
+        let withHandles = try stage.renderedPixels()
+        for corner in hello.handles.map(\.point) {
+            let x = Int(((50 + corner.x) * 2).rounded()), y = Int(((60 + corner.y) * 2).rounded())
+            #expect(withHandles[x, y] == .white, "the handle at \(corner)")
+        }
+        let thick = try #require(toolbar.button(named: "Thick") as? ToolbarButton)
+        #expect(thick.isOn)
+        // A digit gives 32 points (D2). No size has 32 points, so no size is on (D7).
+        interaction.toolbarKey("5")
+        #expect(interaction.marks.marks[1].style.fontSize == 32 && !thick.isOn)
+        interaction.undo()
+
         // "Select" with no selected mark: the second row does not show (row 3), and the box in the
         // overlay is the image that the file gets.
-        try stage.press("Select")
+        #expect(interaction.marks.marks[1] == hello && interaction.selectedIndex == nil)
         let optionsRow = try #require(toolbar.button(named: "Red")?.superview)
         #expect(interaction.isSelecting && select.isOn && !rectangleButton.isOn && optionsRow.isHidden)
         func savedImage() throws -> PixelReader {

@@ -368,6 +368,8 @@ public final class CaptureInteraction {
                 } else {
                     marks.add(draft.mark)
                 }
+                // A corner drag of a text sets the font of the next text too, as a digit does (YAZ-3318).
+                if case .resizeMark = drag, draft.mark.tool == .text { styles[.text] = draft.mark.style }
                 marksChanged()
             }
         case .move, .resize:
@@ -480,8 +482,14 @@ public final class CaptureInteraction {
     /// A key with no box or during a drag does nothing: the mark in progress keeps its tool and
     /// its style. While a text is open, the text field has the keyboard and each key is for the typing.
     public func toolbarKey(_ key: String) {
-        guard !isFinished, box != nil, drag == nil, textEdit == nil, let action = toolbarKeys.action(for: key)
-        else { return }
+        guard !isFinished, box != nil, drag == nil, textEdit == nil else { return }
+        // With a Text mark selected, a digit sets its font (YAZ-3318). It wins over the size or the
+        // colour of that digit. A different mark keeps the keys of D4 (YAZ-2873).
+        if selectedMark?.tool == .text, let fontSize = MarkStyle.digitFontSizes[key] {
+            restyle { $0.fontSize = fontSize }
+            return
+        }
+        guard let action = toolbarKeys.action(for: key) else { return }
         switch action {
         case .select:
             if !isSelecting { toggleSelecting() }
@@ -656,6 +664,19 @@ public final class CaptureInteraction {
             marks.add(mark)
             marksRevision += 1
         }
+        onChange?()
+    }
+
+    /// Return: the open text becomes a mark, as `completeText` does. A new text is then the
+    /// selected mark, with "Select" on (YAZ-3318). Thus a digit, a corner drag or a move works at
+    /// once. T, or a click on Text, starts the next text.
+    public func returnInText() {
+        guard !isFinished, let edit = textEdit else { return }
+        completeText()
+        guard edit.index == nil, !edit.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        tool = nil
+        isSelecting = true
+        selectedIndex = marks.marks.count - 1
         onChange?()
     }
 
